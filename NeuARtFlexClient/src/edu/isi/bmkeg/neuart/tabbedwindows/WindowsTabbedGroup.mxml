@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TabNavigator xmlns:mx="http://www.adobe.com/2006/mxml" width="450" height="444" 
+				 dragEnter="tabnavigator1_dragEnterHandler(event)"
+				 dragOver="dragOverHandler(event)"
+				 dragDrop="dragDropHandler(event)"
+				 dragExit="dragExitHandler(event)">
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.TabbedWindowEvent;
+			
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.core.Container;
+			import mx.core.DragSource;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.DragManager;
+			
+			static private const MENU_ITEM_CLOSE:String = "Close Window";
+			static private const MENU_ITEM_SPLIT_VERTICAL:String = "Split window vertically";
+			static private const MENU_ITEM_SPLIT_HORIZONTAL:String = "Split window horizontally";
+			
+			internal var groupsMgr:WindowsTabbedGroupsMgr;
+			
+			// Variable to store original border color.
+			private var tempBorderColor:uint;
+			
+			// Flag to indicate that tempBorderColor has been set.
+			private var borderColorSet:Boolean = false;
+
+			/**
+			 * Opens a Tabbed Window.
+			 */
+			internal function openTabbedWindow(window:Container):void {
+				addTabbedWindow(window);
+			}
+			
+			internal function addTabbedWindow(window:Container):void {
+				addChild(window);				
+				var index:int = getChildIndex(window);
+				selectedIndex = index;	
+			}
+			
+			/**
+			 * Selects a tab
+			 */
+			internal function setFocusToWindow(window:Container):void {
+				selectedChild = window;								
+			}
+						
+			internal function removeTabbedWindow(window:Container):void {
+				removeChild(window);
+			}
+
+			internal function get numTabbedWindows():int {
+				return numChildren;				
+			}
+			
+			internal function getWindows():Array {
+				return getChildren();	
+			}
+			
+			override protected function childrenCreated():void {
+				super.childrenCreated();
+				addTabbarContextMenu();
+				addTabbarDragInitiator();
+			}
+			
+			private function addTabbarContextMenu():void {
+				var closeItem:ContextMenuItem = new ContextMenuItem(MENU_ITEM_CLOSE);
+				var splitVerticallyItem:ContextMenuItem = new ContextMenuItem(MENU_ITEM_SPLIT_VERTICAL);
+				var splitHorizontallyItem:ContextMenuItem = new ContextMenuItem(MENU_ITEM_SPLIT_HORIZONTAL);
+				closeItem.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT,closeContextMenuItem_itemSelectHandler);
+				splitVerticallyItem.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT,splitVerticallyContextMenuItem_itemSelectHandler);
+				splitHorizontallyItem.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT,splitHorizontallyContextMenuItem_itemSelectHandler);
+				var cm:ContextMenu = tabBar.contextMenu;
+				if (cm == null) {
+					cm = new ContextMenu();
+					cm.hideBuiltInItems();
+					tabBar.contextMenu = cm;
+				}
+				if (cm.customItems == null) {
+					cm.customItems = new Array();					
+				}
+				cm.customItems.push(closeItem);				
+				cm.customItems.push(splitVerticallyItem);
+				cm.customItems.push(splitHorizontallyItem);
+				cm.addEventListener(ContextMenuEvent.MENU_SELECT,tabbarContextMenu_menuSlect);
+			}
+			
+			private function tabbarContextMenu_menuSlect(event:ContextMenuEvent):void {
+				// If there is only one tab then disable Split Windows menu items
+				var menu:ContextMenu = ContextMenu(event.target);
+				var items:Array = menu.customItems;
+				for each (var mi:ContextMenuItem in items) {
+					if (mi.caption == MENU_ITEM_SPLIT_VERTICAL || mi.caption == MENU_ITEM_SPLIT_HORIZONTAL) 
+						mi.enabled = numTabbedWindows > 1;
+				}
+			}
+						
+			private function addTabbarDragInitiator():void {
+				tabBar.addEventListener(MouseEvent.MOUSE_MOVE,tabbar_mousemoveHandler);	
+			}
+			
+			private function tabbar_mousemoveHandler(event:MouseEvent):void {
+				var target:DisplayObject=DisplayObject(event.target);
+				if (target is Button) {
+					var index:int = tabBar.getChildIndex(target);
+					if (index >= 0) {
+						var tw:Container = Container(getChildAt(index));
+						var ds:DragSource = new DragSource();
+						ds.addData(tw, "tabbedwindow");               
+						DragManager.doDrag(this, ds, event);						
+					}
+				}
+				
+			}
+
+			private function closeContextMenuItem_itemSelectHandler(event:ContextMenuEvent):void {
+				var tab:Button = event.mouseTarget as Button;
+				if (tab) {
+					var window:Container = getTabbedWindowFromTabControl(tab);
+					if (window) dispatchEvent(new TabbedWindowEvent(TabbedWindowEvent.CLOSE_CLICK, window));
+				}
+			}
+
+			private function getTabbedWindowFromTabControl(tab:Button):Container {
+				var index:int = tabBar.getChildIndex(tab);
+				if (index >= 0) 
+					return Container(getChildAt(index));
+				return null;
+				
+			}
+
+			private function splitVerticallyContextMenuItem_itemSelectHandler(event:ContextMenuEvent):void {
+				var tab:Button = event.mouseTarget as Button;
+				if (tab) {
+					var window:Container = getTabbedWindowFromTabControl(tab);
+					if (window != null) dispatchEvent(new TabbedWindowEvent(TabbedWindowEvent.SPLIT_VERTICALLY_CLICK, window));
+				}
+			}
+
+			private function splitHorizontallyContextMenuItem_itemSelectHandler(event:ContextMenuEvent):void {
+				var tab:Button = event.mouseTarget as Button;
+				if (tab) {
+					var window:Container = getTabbedWindowFromTabControl(tab);
+					if (window != null) dispatchEvent(new TabbedWindowEvent(TabbedWindowEvent.SPLIT_HORIZONTALLY_CLICK, window));
+				}
+			}
+
+			private function tabnavigator1_dragEnterHandler(event:DragEvent):void
+			{
+				if (event.dragSource.hasFormat("tabbedwindow"))
+				{
+					DragManager.acceptDragDrop(this);
+				}
+				
+			}
+			
+			private function dragOverHandler(event:DragEvent):void {
+				
+				if (isDropAllowed(event))
+				{
+					// Set the border to green to indicate that 
+					// this is a drop target.
+					// Since the dragOver event is dispatched continuosly 
+					// as you move over the drop target, only set it once.
+					if (!borderColorSet) {                 
+						tempBorderColor = 
+							event.currentTarget.getStyle('borderColor');
+						borderColorSet = true;
+					}
+					
+					// Set the drag-feedback indicator based on the 
+					// type of drag-and-drop operation.
+					event.currentTarget.setStyle('borderColor', 'green');
+					var w:Container = getDragSourceTabbedWindow(event.dragSource);
+					if (event.ctrlKey && (w is ITabbedWindow)) {                    
+						DragManager.showFeedback(DragManager.COPY);
+						return;
+					}
+					else {
+						DragManager.showFeedback(DragManager.MOVE);
+						return;
+					}
+				}
+				
+				// Drop not allowed.
+				DragManager.showFeedback(DragManager.NONE);                
+			}
+			
+			private function dragDropHandler(event:DragEvent):void {
+				dragExitHandler(event);
+				if (isDropAllowed(event)) {
+					var ds:DragSource = event.dragSource;
+					var window:Container = getDragSourceTabbedWindow(ds);	
+					var oldParent:WindowsTabbedGroup = WindowsTabbedGroup(window.parent);
+					if (event.action == DragManager.COPY && (window is ITabbedWindow)) {
+						var newWindow:Container = ITabbedWindow(window).duplicateWindow();
+						addTabbedWindow(newWindow)
+					} else {
+						groupsMgr.moveTabbedWindowToGroup(window,this);
+					}
+				}
+			}            
+
+			private function isDropAllowed(event:DragEvent):Boolean {
+				var window:Container = getDragSourceTabbedWindow(event.dragSource);
+				if (window && window.parent !== this)
+					return true;
+				return false;
+			}
+
+			private function getDragSourceTabbedWindow(ds:DragSource):Container {
+				if (ds.hasFormat("tabbedwindow")) {
+					return ds.dataForFormat("tabbedwindow") as Container
+				} else
+					return null;
+			}
+			
+			// Restore the border color.
+			private function dragExitHandler(event:DragEvent):void {
+				if (borderColorSet) {
+					event.currentTarget.setStyle('borderColor', tempBorderColor);
+					borderColorSet = false;					
+				}
+			}
+
+
+		]]>
+	</mx:Script>
+	<mx:Metadata>
+		[Event(name="closeClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.TabbedWindowEvent")]
+		[Event(name="splitVerticallyClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.TabbedWindowEvent")]
+		[Event(name="splitHorizontallyClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.TabbedWindowEvent")]
+	</mx:Metadata>
+</mx:TabNavigator>

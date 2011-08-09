@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" width="214" height="594"
+		 label="{atlas.atlasName}"  horizontalAlign="center" >
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+			
+			import mx.controls.Alert;
+			import mx.controls.listClasses.IListItemRenderer;
+			import mx.events.ListEvent;
+
+			private var _atlas:AtlasStructure;
+			
+			[Bindable]
+			public function get atlas():AtlasStructure {
+				return _atlas;
+			}
+			
+			public function set atlas(a:AtlasStructure):void {
+				_atlas = a;
+			}
+						
+
+			private function thumbnails_itemClickHandler(event:ListEvent):void
+			{
+				var ir: IListItemRenderer = event.itemRenderer;
+				if (ir) {
+					var plate:AtlasPlate = ir.data as AtlasPlate;
+					if (plate) {
+						var atlasEvent:AtlasEvent = new AtlasEvent(AtlasEvent.ATLAS_PLATE_CLICK,atlas.atlasURI, plate.plateName);
+						dispatchEvent(atlasEvent);
+					}
+				}
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Metadata>
+		[Event(name="atlasPlateClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent")]
+	</mx:Metadata>
+	<mx:TileList id="thumbnails" width="100%" height="100%" 
+				 showDataTips="true" 
+				 itemRenderer="edu.isi.bmkeg.neuart.atlasbrowser.views.CoronalThumbnail" 
+				 columnCount="1" itemClick="thumbnails_itemClickHandler(event)"
+				 dataProvider="{atlas.sortedPLates}" maxColumns="1" wordWrap="true" 
+				 direction="horizontal" rowCount="0" />
+</mx:HBox>

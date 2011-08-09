@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   dropShadowVisible="true" width="348" height="416"  skinClass="spark.skins.spark.BorderContainerSkin" backgroundColor="#B5F3E4" contentBackgroundColor="#FFFFFF">
+	<fx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.AtlasBrowserFramework;
+			
+			import mx.controls.Alert;
+			
+			[Bindable]
+			public var evidence:Object;
+			
+			private var pubmedURLhead:String = "https://www.ncbi.nlm.nih.gov/pubmed/";
+			
+			public function openPublicationClickHandler(event:MouseEvent):void {
+				var pmid:String = evidence.pmid as String;
+				if (pmid) {
+					navigateToURL(new URLRequest(pubmedURLhead + pmid), "PubMed");							
+				}
+			}
+			
+			private function openExperimentModelClickHandler(event:MouseEvent):void {
+//				Alert.show("Clicked open Exp");
+				var experimentUid:String = evidence.ExpUID as String;
+				if (experimentUid)
+					AtlasBrowserFramework.instance.openExperimentViewerWindow(experimentUid);						
+			}
+			
+			private function openLabelLocationClickHandler(event:MouseEvent):void {
+				var datamapUri:String = evidence.DataMapUri as String;
+				if (datamapUri) {
+					var regions:Array;
+					var region:String = evidence["LabelRegion"];
+					if (region) {
+						regions = new Array(region);
+					} else {
+						regions = overlap2collection(evidence["LabelOverlap"]);
+					}
+					AtlasBrowserFramework.instance.openDataMapBrainRegionWindow(datamapUri, regions);						
+				}
+			}
+			
+			private function openInjectionLocationClickHandler(event:MouseEvent):void {
+				var datamapUri:String = evidence.DataMapUri as String;
+				if (datamapUri) {
+					var regions:Array;
+					var region:String = evidence["InjectionRegion"];
+					if (region) {
+						regions = new Array(region);
+					} else {
+						regions = overlap2collection(evidence["InjectionOverlap"]);
+					}
+					AtlasBrowserFramework.instance.openDataMapBrainRegionWindow(datamapUri, regions);						
+				}
+			}
+			
+			private function overlap2collection(overlap:String):Array {
+				return overlap.split(",");
+			}
+
+		]]>
+	</fx:Script>
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<s:TextArea height="56"
+				text="{evidence.Citation}" width="323" y="10" x="10"/>
+	<s:Label x="10" y="74" text="PubMed ID:" width="71" height="14"/>
+	<s:TextArea x="78" y="69" width="255" height="23" 
+				text="{evidence.pmid}" />
+	<s:Label x="10" y="100" text="Chemical:" width="59"/>
+	<s:TextArea x="78" y="100" width="255" height="24" 
+				text="{evidence.Chemical}" />
+	<s:Label x="10" y="132" text="Label:" width="60" height="13"/>
+	<s:TextArea x="78" y="132" width="124" height="22" 
+				text="{evidence.LabelType}" />
+	<s:TextArea x="210" y="132" width="123" height="22" 
+				text="{evidence.LabelDensity}" />
+	<s:Label x="10" y="162" text="Injection Location:" width="60"/>
+	<s:TextArea x="78" y="162" width="255" height="36" 
+				text="{evidence.Injection}" />
+	<s:Label x="10" y="210" text="Label Location:" width="60"/>
+	<s:TextArea x="78" y="206" width="255" height="32" 
+				text="{evidence.LabelLocation}" />
+	<s:Label x="10" y="244" text="Data Map:"/>
+	<s:TextArea x="78" y="244" width="255" height="20" 
+				text="{evidence.DataMapName}" />
+	<s:Label x="10" y="272" text="Experiment:" height="18"/>
+	<s:TextArea x="78" y="268" width="255" height="18" 
+				text="{evidence.ExpSource}" />
+	<s:TextArea x="78" y="294" width="255" height="19" 
+				text="{evidence.ExpLabel}" />
+	<mx:LinkButton x="10" y="327" label="Open Injection Location in Data Map"
+				   click="openInjectionLocationClickHandler(event)" color="#1E53C0" textDecoration="underline"/>
+	<mx:LinkButton x="10" y="344" label="Open Label Location in Data Map"
+				   click="openLabelLocationClickHandler(event)" color="#1E53C0" textDecoration="underline"/>
+	<mx:LinkButton x="10" y="362" label="Open Experiment Model"
+				   click="openExperimentModelClickHandler(event)" color="#1E53C0"
+				   textDecoration="underline"/>
+	<mx:LinkButton x="10" y="381" label="Open Publication" click="openPublicationClickHandler(event)"
+				   color="#1E53C0" textDecoration="underline"/>
+</s:BorderContainer>
+

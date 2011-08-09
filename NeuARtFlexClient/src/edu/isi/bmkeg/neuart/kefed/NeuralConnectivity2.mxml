@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="1150" height="560"
+		 initialize="init()" xmlns:kefed="edu.isi.bmkeg.neuart.kefed.*">
+	<s:layout>
+		<s:VerticalLayout/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.BioscholarModel;
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.AtlasBrowserFramework;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.BrowserModel;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasService;
+			import edu.isi.bmkeg.neuart.atlasservice.BrainRegion;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMapDescription;
+			import edu.isi.bmkeg.utils.powerloom.PL;
+			
+			import flash.net.navigateToURL;
+			import flash.utils.getTimer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ListCollectionView;
+			import mx.controls.Alert;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.dataGridClasses.DataGridItemRenderer;
+			import mx.controls.dataGridClasses.MXDataGridItemRenderer;
+			import mx.controls.listClasses.BaseListData;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.formatters.NumberBaseRoundType;
+			import mx.formatters.NumberFormatter;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			import mx.rpc.remoting.RemoteObject;
+			import mx.rpc.soap.WebService;
+			import mx.utils.ArrayUtil;
+
+			namespace plsoap = "http://www.isi.edu/powerloom/";
+			private var pubmedURLhead:String = "https://www.ncbi.nlm.nih.gov/pubmed/";
+			private var loader:URLLoader = new URLLoader();
+			private var startTime:uint = 0;
+			
+			private static const LEGEND_SIZE:int = 8;
+			
+			/** Ordered List of values for representing density as reported in the XML file.
+			 */
+			private var densityValues:Array = ["", "0", "present", "very-sparse", "sparse", "sparse-to-moderate",
+				"moderate", "moderate-to-dense", "dense", "very-dense"];
+			/** Ordered list of symbols for density that corresponds to the densityValues list.
+			 *  The correspondence is by position.  A many to one mapping is implemented, since more
+			 *  than one density value will map to the same symbol.
+			 */
+			private var densitySymbols:Array = ["?", "0", "*", "+", "+", "++", "++", "+++", "+++", "+++"];
+			
+			private var _cachedEvidenceSourceRegion:String;
+			private var _cachedEvidenceTargetRegion:String;
+			
+			[Bindable]
+			private var evidenceCollection:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var matrixDataProvider:ListCollectionView;
+			
+			private var _datamapNames:Object;
+			
+			private function init():void {
+				// Load DatamapNames
+				var aServ:AtlasService = new AtlasService();
+				aServ.addListAvailableDataMapsEventHandler(ResultEvent.RESULT, handleListDMLoadResult);
+				aServ.listAvailableDataMaps(AtlasBrowserFramework.DEFAULT_ATLAS_URI);						
+			}
+			
+			private function handleListDMLoadResult(event:ResultEvent):void {
+				var datamapDescs:ArrayCollection = event.result as ArrayCollection;
+				_datamapNames = new Object();
+				if (datamapDescs) {
+					for each (var desc:DataMapDescription in datamapDescs) {
+						_datamapNames[desc.uri] = desc.name;
+					}
+				}
+				
+			}
+			
+			public function handleMatrixData(event:Event):void {
+				var matrixData:XML = new XML(loader.data);
+				trace("Matrix data loaded. " + matrixData.elements("row").length() + " rows");
+				//				trace(matrixData);
+				processMatrixData(matrixData);
+			}
+			
+			// Ordering function for density values.
+			public function higherDensity(x:String, y:String):Boolean {
+				return densityValues.indexOf(x) > densityValues.indexOf(y);
+			}
+			
+			
+			/** Iterates through the XML data representation and constructs the
+			 *  connection matrix based on the information in that XML file.
+			 * 
+			 * @param data The XML contents describing connections
+			 */
+			public function processMatrixData(data:XML):void {
+				var matrixData:ArrayCollection = new ArrayCollection();
+				for each (var row:XML in data.children()) {
+					var rowObject:Object = new Object();
+					rowObject.source = row.@source;
+					rowObject.target = row.@target;
+					var max:int = 0;
+					for each (var experiment:XML in row.children()) {
+						var density:String = experiment.@density;
+						var score:int = densityValues.indexOf(density);
+						if (score > max) {
+							max = score;
+						}
+					}
+					rowObject.density = densitySymbols[max];
+					matrixData.addItem(rowObject);
+				}
+				matrixDataProvider = new ListCollectionView(matrixData);
+				matrixDataProvider.filterFunction = matrixFilter;
+			}
+			
+			/**  Create and submit a PowerLoom query to find the experiments
+			 *   that constitute evidence for a connection between the source
+			 *   and the target brain locations.  The answer will be handled
+			 *   by an asynchronous event handler.
+			 * 
+			 * @param source The starting brain region for the connection
+			 * @param target The ending brain region for the connection
+			 */
+			public function getEvidence(source:String, target:String):void {
+				startTime = getTimer();
+				evidenceCount.text = "Searching...";
+				evidenceTime.text = "";
+				evidenceCollection.removeAll();
+				var cmd:XML = <retrieval xmlns="http://www.isi.edu/powerloom/">
+						<module>EXPERIMENTS-V2</module>
+						<nresults>ALL</nresults>
+						<pattern>(?cite ?chemical ?labeling-type ?labeling 
+						?injection-part-of ?injection-overlaps  ?labeling-part-of ?labeling-overlaps
+						?xsource ?xlabel ?id ?pmid ?source ?target ?datamap ?exp)</pattern>
+	<!--						<options>:INFERENCE-LEVEL :ASSERTION</options> -->
+						<options>:MAXIMUM-DEPTH 60</options>
+					(AND (= ?source "{source}")
+				(= ?target "{target}")
+						     (EXISTS (?pub ?ref ?datum ?injection ?injection-site ?label-result ?label-site ?data-map-datum)
+						       (AND 
+						         (evidence-about-connection-from-regions (brain-region-for ?source) (brain-region-for ?target) ?labeling-type ?labeling ?datum ?exp ?pub)
+						         (BOUND-VARIABLES ?exp ?datum)
+					 (FORK (EXISTS ?v (measurement-variable-datum ?exp 4815E4A8-CFF6-3CBF-91EA-5A5E2221A1D3 ?v))
+					       (AND (measurement-variable-datum ?exp 4815E4A8-CFF6-3CBF-91EA-5A5E2221A1D3 ?data-map-datum)
+					            (datum-measurement-value ?data-map-datum 4815E4A8-CFF6-3CBF-91EA-5A5E2221A1D3 ?datamap))
+					       (= ?datamap ""))
+		                         (datum-context-value ?datum E6120090-2377-1AFA-0227-5A5CDD8E5316 ?injection)
+		                         (datum-measurement-value ?datum 666FFF6B-9AE2-D0D7-2E22-5A5CDD8FA0F7 ?label-result)
+		                         (CF63B571-71F0-4F99-ABE7-5A5CDD8FBFA4 ?injection ?chemical)
+		                         (2ED242F0-9B67-207A-5D4F-5A5CDD8ED135 ?injection ?injection-site)
+		                         (159E07F1-9F51-901D-7851-5A6002B95998 ?label-result ?label-site)
+ 		                         
+ 		                         (BOUND-VARIABLES ?injection-site ?label-site)
+ 		                         (QUERY (AND 
+ 		                            (COLLECT-INTO-SET (SETOFALL ?x (/PART/OVERLAPS ?injection-site (brain-region-for ?x))) ?injection-overlaps)
+ 		                            (COLLECT-INTO-SET (SETOFALL ?x (/PART/PROPER-PART-OF ?injection-site (brain-region-for ?x))) ?injection-part-of)
+ 		                            (COLLECT-INTO-SET (SETOFALL ?x (/PART/OVERLAPS ?label-site (brain-region-for ?x))) ?labeling-overlaps)
+ 		                            (COLLECT-INTO-SET (SETOFALL ?x (/PART/PROPER-PART-OF ?label-site (brain-region-for ?x))) ?labeling-part-of)
+ 		                         ) :INFERENCE-LEVEL :ASSERTION)
+ 		                      (experiment-reference ?exp ?ref)
+ 		                      (experiment-source ?exp ?xsource ?xlabel)
+ 		                      (BOUND-VARIABLES ?ref)
+						     (reference-text ?ref ?cite)
+						     (reference-digital-library-id ?ref ?id)
+						     (reference-pmid ?ref ?pmid)
+ 		                         ))
+						     )
+				</retrieval>;
+				//				trace(cmd);
+				evidenceWS.Retrieval(cmd);
+			}
+			
+			/** Handle the answer to a query to find experiments that constitute
+			 *  evidence for a connection.  Display the results using a standard
+			 *  PowerLoom query answer widget.
+			 * 
+			 * @param event The result event from the PowerLoom WS query
+			 */			
+			public function evidenceResultHandler(event:ResultEvent):void {
+				clearError();
+				var xmlDoc:XML = new XML(evidenceWS.Retrieval.lastResult);
+				var nResults:int = int(xmlDoc.plsoap::nresults);
+				for (var i:int = 0; i < nResults; i++) {
+					evidenceCollection.addItem(makeTupleObject(xmlDoc.plsoap::tuple[i]));
+				}
+				var stopTime:uint = getTimer();
+				evidenceCount.text = xmlDoc.plsoap::nresults.toString() + " data point" + (nResults == 1 ? "" : "s");
+				evidenceTime.text = elapsedTimeFormatter.format((stopTime - startTime) / 1000.0) + "s";
+				evidenceFile.executeBindings();
+			}
+			
+			private function makeTupleObject(tuple:XML):Object {
+				var tupleObject:Object = new Object();
+				var region:String = null;
+				var overlap:String = null;
+				
+				tupleObject["Citation"] = PL.formatQueryItem(tuple.plsoap::item[0], false, true);
+				tupleObject["Chemical"] = PL.formatQueryItem(tuple.plsoap::item[1], false, false);
+				tupleObject["LabelType"] = PL.formatQueryItem(tuple.plsoap::item[2], false, false);
+				tupleObject["LabelDensity"] =PL.formatQueryItem(tuple.plsoap::item[3], false, false);
+				
+				var dmuri:String = PL.formatQueryItem(tuple.plsoap::item[14], false, false);
+				var dmname:String;
+				if (_datamapNames && dmuri) {
+					dmname = _datamapNames[dmuri];
+					if (!dmname) dmname = "** Datamap Name Not Found **";
+				} else {
+					dmname = "loading...";					
+				}
+				tupleObject["DataMapUri"] = dmuri;
+				tupleObject["DataMapName"] = dmname;
+				
+				region = PL.formatQueryItem(tuple.plsoap::item[4], true, true);
+				overlap = tupleObject["Injection"] = "overlaps " + PL.formatQueryItem(tuple.plsoap::item[5], true, true);
+				if (region != "") {
+					tupleObject["Injection"] = "into " + region;						
+				} else {
+					tupleObject["Injection"] = "overlaps " + overlap;
+				}
+				tupleObject["InjectionRegion"] = region;
+				tupleObject["InjectionOverlap"] = overlap;
+				
+				region = PL.formatQueryItem(tuple.plsoap::item[6], true, true);
+				overlap = PL.formatQueryItem(tuple.plsoap::item[7], true, true);
+				if (region != "") {
+					tupleObject["LabelLocation"] = "in " + region;						
+				} else {
+					tupleObject["LabelLocation"] = "overlaps " + overlap;
+				}
+				tupleObject["LabelRegion"] = region;
+				tupleObject["LabelOverlap"] = overlap;
+				
+				tupleObject["ExpSource"] = PL.formatQueryItem(tuple.plsoap::item[8], false, true);
+				tupleObject["ExpLabel"] = PL.formatQueryItem(tuple.plsoap::item[9], false, true);
+				tupleObject["id"] = PL.formatQueryItem(tuple.plsoap::item[10], false, false);
+				tupleObject["pmid"] = PL.formatQueryItem(tuple.plsoap::item[11], false, false);
+				tupleObject["ExpUID"] = PL.formatQueryItem(tuple.plsoap::item[15], false, false);
+				
+				return tupleObject;
+			}
+			
+			public function clearError ():void {
+				currentState="";
+				if (errorType && errorDetail) {
+					errorType.text="";
+					errorDetail.text="";
+				}
+			}
+			
+			public function faultHandler(event:FaultEvent):void {
+				currentState="Show_Errors";
+				errorType.text=event.fault.faultString;
+				errorDetail.text=event.fault.faultDetail;
+			}
+			
+			/** Handler for double-clicks on a connection matrix cell.\
+			 *  If the cell indicates evidence for or against a connection,
+			 *  then the source and target regions will be identified and
+			 *  a query issued to return the evidence.
+			 *  
+			 *  @event The list double-click event with the clicked coordinates.
+			 */
+			public function connectionDoubleClickHandler(event:ListEvent):void {
+				var item:Object = connectionMatrix.dataProvider.getItemAt(event.rowIndex);
+				trace("Connection " + item.source + " => " + item.target + "  = " + item.density);
+				connectionDescription.text = item.source + " => " + item.target;
+				evidenceCount.text = "";
+				libraryID.text = "";
+				evidenceFile.dataProvider = null;
+				getEvidence(item.source, item.target);
+			}
+			
+			/** Handler for a change in the selection of evidence.  Updates
+			 *  the LibraryID text field.
+			 */
+			public function handleEvidenceChange(event:Event):void {
+				if (evidenceFile.selectedItem == null) {
+					libraryID.text = "";
+					pmidLabel.text = "";
+				} else {
+					libraryID.text = evidenceFile.selectedItem.id;
+					pmidLabel.text = evidenceFile.selectedItem.pmid;
+				}
+			}
+			
+			/** Handler for double-clicks in an evidence file row.  Only the row
+			 *  is considered.  The exact cell is unimportant.  This will issue
+			 *  a call to display the underlying documents for this particular evidence.
+			 *  This includes both the PDF file and a processed XML version.
+			 * 
+			 * @event The list double-click event with the row coordinate.
+			 */
+			public function evidenceDoubleClickHandler(event:ListEvent):void {
+				var item:Object = evidenceFile.dataProvider.getItemAt(event.rowIndex);
+				var experimentUid:String = item.ExpUID as String;
+				if (experimentUid)
+					AtlasBrowserFramework.instance.openExperimentViewerWindow(experimentUid);
+				
+			}
+			
+			private function matrixFilter(item:Object):Boolean {
+				var itemSource:String = item.source;
+				var itemTarget:String = item.target;
+				if (sourceFilter.text && itemSource.toUpperCase() != sourceFilter.text.toUpperCase()) return false;
+				if (targetFilter.text && itemTarget.toUpperCase() != targetFilter.text.toUpperCase()) return false;
+				return true;
+			}
+			
+			private function handlePlain(event:ResultEvent):void
+			{
+				//				xmlContents.htmlText = event.result.toString();
+			}
+			
+			
+			private function handleFault(event:FaultEvent):void
+			{
+				Alert.show(event.fault.faultString + "\n" + event.fault.faultDetail, "Error");
+			}
+						
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:WebService id="evidenceWS"
+					   fault="faultHandler(event);"
+					   useProxy="false"
+					   wsdl='{BioscholarModel.model.ploomWsdlUrl}'
+					   showBusyCursor="true">
+			<mx:operation name="Retrieval"
+						  resultFormat="e4x"
+						  result="evidenceResultHandler(event);"/>
+		</mx:WebService>
+		<mx:NumberFormatter id="elapsedTimeFormatter" precision="1"/>
+		<fx:XML id="matrixData" source="connectivity-data.xml"/>
+		
+		<fx:Component id="evidenceRenderer" >
+			<kefed:EvidenceRenderer popup="{outerDocument.actions}" />
+			<!-- <s:MXDataGridItemRenderer 
+				rollOver="actions_rollOverHandler(event)"
+				rollOut="actions_rollOutHandler(event)" >
+				<fx:Script>
+					<![CDATA[
+						
+						import spark.components.PopUpAnchor;
+						
+						[Bindable]
+						public var popup:PopUpAnchor;
+						
+						protected function panel1_rollOverHandler(event:MouseEvent):void
+						{
+							//				currentState = "hovered";
+						}
+						
+						
+						protected function panel1_rollOutHandler(event:MouseEvent):void
+						{	
+							//				currentState = "normal";
+						}
+						
+						
+						protected function actions_rollOverHandler(event:MouseEvent):void
+						{
+							popup.displayPopUp = true;
+						}
+						
+						
+						protected function actions_rollOutHandler(event:MouseEvent):void
+						{
+							popup.displayPopUp = false;
+						}
+						
+					]]>
+				</fx:Script>
+				<s:states> 
+					<s:State name="normal"/> 
+					<s:State name="hovered"/> 
+					<s:State name="selected"/> 
+				</s:states> 
+				
+				<s:Label id="lblData" top="0" left="0" right="0" bottom="0" text="{dataGridListData.label}" 
+						 fontStyle.hovered="italic" fontSize.hovered="14" />
+			</s:MXDataGridItemRenderer> -->
+
+		</fx:Component>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="Show_Errors" />
+	</s:states>
+	
+	<mx:VDividedBox id="content" width="100%" height="100%">
+		<mx:VBox width="100%" height="70%">
+			<mx:VBox>
+				<mx:Label text="Filter" />
+				<mx:HBox width="100%" >
+					<mx:VBox width="50%">
+						<mx:Label text="Source" />
+						<mx:TextInput id="sourceFilter" width="100%" />
+					</mx:VBox>
+					<mx:VBox width="50%">
+						<mx:Label text="Target" />
+						<mx:TextInput id="targetFilter" width="100%" />
+					</mx:VBox>
+					<mx:VBox>
+						<mx:Button id="refreshButton" label="Filter Table" click="{matrixDataProvider.refresh()}"/>
+						<mx:Button id="clearButton" label="Clear Filter" click="{sourceFilter.text=null;targetFilter.text=null;matrixDataProvider.refresh()}"/>								
+					</mx:VBox>
+				</mx:HBox>
+			</mx:VBox>
+			<mx:DataGrid id="connectionMatrix" width="100%" height="70%" 
+						 doubleClickEnabled="true" itemDoubleClick="connectionDoubleClickHandler(event)"
+						 initialize="processMatrixData(matrixData)" 
+						 dataProvider="{matrixDataProvider}">
+				<mx:columns>
+					<mx:DataGridColumn headerText="Source" dataField="source" />
+					<mx:DataGridColumn headerText="Target" dataField="target" />
+					<mx:DataGridColumn headerText="Strength" dataField="density" />				
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:Label id="legend" fontSize="{LEGEND_SIZE}"
+					  text="Connection strength: 0 = none; + = weak; ++ = moderate; +++ = strong; * = unknown strength     Double-click to see evidence for connection."/>
+			
+		</mx:VBox>
+		<mx:VBox width="100%" height="30%">
+			<!--    	<mx:Spacer height="5"/>  -->
+			<mx:HBox>
+				<mx:Label id="connectionDescription" color="black" text=""/>
+				<mx:Label id="evidenceCount" color="black" text=""/>
+				<mx:Label id="evidenceTime" color="gray" text=""/>
+			</mx:HBox>
+			<s:Group width="100%" height="100%">
+				<mx:DataGrid id="evidenceFile" width="100%" height="100%" 
+							 dataProvider="{evidenceCollection}"
+							 change="handleEvidenceChange(event)"
+							 doubleClickEnabled="true" itemDoubleClick="evidenceDoubleClickHandler(event)"
+							 >
+					<mx:columns>
+						<mx:DataGridColumn headerText="Citation" dataField="Citation" width="200" showDataTips="true" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="PubMedID" dataField="pmid" width="70" textAlign="right" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Chemical" dataField="Chemical" width="200" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Label Type" dataField="LabelType" width="70" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Label Density" dataField="LabelDensity" width="100" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Injection Location" dataField="Injection" width="150" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Label Location" dataField="LabelLocation" width="150" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Data Map" dataField="DataMapName" width="200" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Exp. Source" dataField="ExpSource" showDataTips="true" itemRenderer="{evidenceRenderer}" />
+						<mx:DataGridColumn headerText="Exp. Label" dataField="ExpLabel" itemRenderer="{evidenceRenderer}" />
+					</mx:columns>
+				</mx:DataGrid>
+
+				<s:PopUpAnchor id="actions" popUpPosition="above" >
+					<kefed:EvidenceDescription  rollOut="{actions.displayPopUp=false}" />
+				</s:PopUpAnchor>
+
+			</s:Group>
+			<mx:HBox id="pubid">
+				<mx:Label text="PubMed ID:"/>
+				<mx:Label id="pmidLabel"/>
+				<mx:Spacer width="15"/>
+				<mx:Label text="Library ID:"/>
+				<mx:Label id="libraryID"/>
+			</mx:HBox>
+			<mx:Label fontSize="{LEGEND_SIZE}" text="Double click to show PubMed page for papers with PubMedID"/>
+		
+		</mx:VBox>
+
+		<mx:VBox width="100%" height="10%" includeIn="Show_Errors">
+			<mx:HRule width="100%"/>
+			<mx:Label text="Errors" color="gray"/>
+			<mx:Label id="errorType" color="red"/>
+			<mx:Text id="errorDetail" color="red"/>
+		</mx:VBox>
+
+	</mx:VDividedBox>
+
+</s:Group>

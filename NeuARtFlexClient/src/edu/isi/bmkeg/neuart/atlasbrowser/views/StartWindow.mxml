@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="436" height="518"
+		 label="Welcome">
+	<mx:Text width="100%" textAlign="center" fontSize="30" height="47" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Welcome to NeuARt
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			NeuARt is a brain atlas browser and an image data viewer intended to support
+			neuroscientists in their research activities. NeuARt user interface makes 
+			it easier to compare several images by showing them side by side. It also helps to 
+			aggregate data by overlaying different data sets on top of a single atlas image.
+			The following is a quick introduction on how to perform some basic NeuARt tasks.
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Opening an Atlas
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			First, open the atlas chooser by clicking in the [+] button at the bottom of the 
+			"Loaded Atlases" panel (on the left). Select the atlas that you want to work 
+			with and click the [open] button. After this operation is completed, the 
+			"Loaded Atlases" panel
+			will show a new tab corresponding to the opened atlas. This tab will contain the coronal plate 
+			selector. In addition to the creation of a new "Loaded Atlases" tab,
+			the top panel will also show a new tab. This tab will contain
+			the sagittal plate selector. It is possible to have more than one atlas open simultaneously.
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Viewing an Atlas Plate Image
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			An atlas plate image can be opened in several ways.
+			One way to open an atlas plate image is to 
+			click on a thumbnail in the "Loaded Atlases"'s coronal plate selector
+			(on the left). Another alternative is to click on a plate level indicator (a vertical line) on 
+			the top panel's sagittal plate selector. Yet another method is to click on a data-map-level
+			node in the data map tree navigator or in a data map sampling image (described bellow). The 
+			opened atlas plate will either be 
+			shown in a new tab (if that plate wasn't already open) or its corresponding tab will be
+			brought to the front (if that plate had been already open) in the main panel. 
+			The zoom level of an atlas plate image can be adjusted by dragging the slider
+			at the bottom right corner of the atlas plate window.
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Opening a Data Map
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			To enable a data map to be opened its corresponding atlas has to be previously open. To open
+			a data map do: open the data map chooser by clicking in the [+] button at the bottom of the 
+			"Loaded Data Maps" panel (on the right). A data map chooser window will pop up showing an atlas 
+			selector and a list of all the data maps available for the selected atlas. Select the data map 
+			that you want to work with and click the [open] button. Once the data map is
+			opened the "Loaded Data Maps" panel
+			will show (or update) the data maps tree navigator (top) and a data maps 
+			visibility control (bottom). Additionally, its images will be shown automatically on all 
+			corresponding atlas plate windows that had been already open or that will be opened in the future.
+	</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Controlling the Visibility of the Data Map Images
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			The visibility of the data map images can be controlled with the data maps visibility control
+			(bottom of the "Loaded Data Maps" panel on the right).
+			The data maps visibility control contains one entry for each opened data map.
+			Each entry contains a checkbox and a color picker (a small colored square). The 
+			checkbox controls whether to show or hide the data map images that have been 
+			overlaid on 
+			their corresponding atlas plate windows.
+			The color picker controls the color assigned to the data map images overlays.
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Using the Data Maps Tree Navigator
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			The data maps tree navigator is located at the top of the "Loaded Data Maps" 
+			panel (on the right). Its function is to organize in an [atlas / data-maps / plate-levels] 
+			and in an [atlas / plate-levels / data-maps] hierarchies all the images of all opened 
+			data maps. The data maps tree navigator nodes provide access to the atlases and data maps images.
+			Clicking on data map tree navigator in a plate-level node will cause its 
+			corresponding atlas plate image to be opened in a window. Clicking on a data-map
+			node will cause a window sampling all its data map images to be opened .
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Sampling all the images of a Data Map
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			A window with a tiled arrangement of all the images of a data map can be opened by clicking on a
+			data-map node in the data maps tree navigator (on the "Opened Data Maps"
+			panel on the right). 
+			The size of each tile can be controlled with the slider
+			located at the bottom left corner of that window. Clicking on a tile will
+			cause its corresponding atlas plate to be opened in another window. 
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="20" height="28" fontWeight="bold" fontFamily="Arial">
+		<mx:text>
+			Windows Manipulation
+		</mx:text>
+	</mx:Text>
+	<mx:Text width="100%" fontSize="15">
+		<mx:text>
+			Each atlas plate image window or data map images sampling window that has been opened 
+			following the above procedures will be shown in a tab in the main panel.  
+			The layout of these windows can be rearranged using the windows context menues. 
+			A window's context menu can be opened by right-clicking on a window's tab. One of the 
+			operations accesible thru
+			this menu is to close a window. Another menu option is to split a window 
+			vertically or horizontally. Spliting a windwow will create a new partition in the main panel
+			where another window can be shown. Having several partitions allows several windows to be shown
+			simultaneosully side by side. The windows shown at each partition can be further rearranged
+			by dragging and dropping a window's tab across partitions. A clone of a window can be created by
+			holding down the [ctrl] key while
+			dropping a window's tab in another partition. Window clones are 
+			useful to compare different sections of the same image.
+		</mx:text>
+	</mx:Text>	
+</mx:VBox>

@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:svgweb="org.svgweb.*"
+		   toolTip="{data.atlasPlateName}">
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.svg.SVGUtils;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMapPlate;
+			
+			import mx.controls.Alert;
+			import mx.controls.Image;
+			import mx.controls.ProgressBar;
+			import mx.events.FlexEvent;
+			import mx.events.ResizeEvent;
+			
+			import org.svgweb.SVGViewerFlash;
+			import org.svgweb.SVGViewerFlex;
+			import org.svgweb.core.SVGViewer;
+			import org.svgweb.nodes.SVGGroupNode;
+			
+			private var _originalHeight:Number;
+			private var _originalWidth:Number;
+			
+			private var _waitingForAtlasLoad:Boolean = false;
+			private var _waitingForDMLoad:Boolean = false;
+			
+			public var cachedDMSVGViewers:Object;
+			
+			private var svgv:SVGViewerFlex;
+//			private var _progressIndicator:ProgressBar;
+			
+			protected override function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void {
+				var currentSvgViewer:SVGViewerFlash = getSvgViewer();
+				if (!data) {
+					if (currentSvgViewer)
+						clearSvgViewer();
+//					if (currentSvgViewer || _progressIndicator)
+//						clearSvgViewer();
+				} else {
+					if (data.atlasPlate.coronalImageLoad && 
+						data.coronalLayerImageLoad) {
+						
+						var svgAtlas:SVGViewerFlash = cachedDMSVGViewers[data.atlasPlate.plateName] as SVGViewerFlash;
+						if (!svgAtlas) {
+							
+//							setProgressIndicator();
+							svgAtlas = processDataMapLayerImageXML();						
+							
+							if (svgAtlas) {
+								cachedDMSVGViewers[data.atlasPlate.plateName] = svgAtlas;
+							}
+						}
+						
+						if (svgAtlas && currentSvgViewer != svgAtlas) {
+							setSvgViewer(svgAtlas);					
+						}
+//					} else {
+//						
+//						setProgressIndicator();
+//						
+					}							
+					
+				}
+				super.updateDisplayList(unscaledWidth, unscaledHeight);
+				
+			}
+
+			public override function set data(value:Object):void {
+				
+				if (data != value) {
+					if (data) {
+						removeDataEventListeners();
+					}
+				}
+				super.data = value;
+				
+				if (data) {
+					if (!data.atlasPlate.coronalImageLoad)
+						loadAtlasPlateImageXML();
+					if (!data.coronalLayerImageLoad)
+						loadDataMapLayerImageXML();						
+				}
+				invalidateDisplayList();		
+			}
+
+			private function loadAtlasPlateImageXML():void {
+
+				if (_waitingForAtlasLoad) {
+					return;	
+				}
+
+				_waitingForAtlasLoad = true;
+				
+				var atlasPlate:AtlasPlate = AtlasPlate(data.atlasPlate);
+				atlasPlate.addEventListener(Event.COMPLETE,onAtlasComplete);
+				atlasPlate.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				atlasPlate.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				
+				atlasPlate.loadCoronalImageXML();
+			}
+
+			private function onAtlasComplete(event:Event):void {
+
+				_waitingForAtlasLoad = false;
+				var atlasPlate:AtlasPlate = AtlasPlate(data.atlasPlate);
+				atlasPlate.removeEventListener(Event.COMPLETE,onAtlasComplete);
+				atlasPlate.removeEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				atlasPlate.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+
+				invalidateDisplayList();	
+				
+			}
+
+			protected function loadDataMapLayerImageXML():void {
+				if (_waitingForDMLoad) {
+					return;
+				} 
+		
+				var dmPlate:DataMapPlate = DataMapPlate(data);
+				
+				dmPlate.addEventListener(Event.COMPLETE, onDMComplete);
+				dmPlate.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				dmPlate.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				
+				_waitingForDMLoad = true;
+
+				dmPlate.loadCoronalLayerImageXML();
+}
+			
+			protected function onDMComplete(event:Event):void {
+
+				_waitingForDMLoad = false;
+				var dmPlate:DataMapPlate = DataMapPlate(data);
+				
+				dmPlate.removeEventListener(Event.COMPLETE, onDMComplete);
+				dmPlate.removeEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				dmPlate.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				
+				invalidateDisplayList();		
+			}
+
+			private function removeDataEventListeners():void {
+				var atlasPlate:AtlasPlate = AtlasPlate(data.atlasPlate);
+				atlasPlate.removeEventListener(Event.COMPLETE,onAtlasComplete);
+				atlasPlate.removeEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				atlasPlate.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				
+				_waitingForAtlasLoad = false;
+				
+				var dmPlate:DataMapPlate = DataMapPlate(data);
+				
+				dmPlate.removeEventListener(Event.COMPLETE, onDMComplete);
+				dmPlate.removeEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				dmPlate.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+			
+				_waitingForDMLoad = false;
+				
+			}
+			
+			private function processDataMapLayerImageXML():SVGViewerFlash {
+
+				var dmPlate:DataMapPlate = DataMapPlate(data);					
+				var atlasPlate:AtlasPlate = dmPlate.atlasPlate;
+				var svgAtlas:SVGViewerFlash = new SVGViewerFlash();
+
+				svgAtlas.xml = new XML(atlasPlate.coronalImageLoad);
+
+				var atlasNode:SVGGroupNode = getSvgAtlasLayer(svgAtlas);
+				var svgDMLayer:SVGGroupNode = createSvgLayer();
+
+				if (atlasNode && svgDMLayer) {
+					atlasNode.addSVGChild(svgDMLayer);
+				}
+				
+				return svgAtlas;				
+			}
+
+			private function setSvgViewer(svgAtlas:SVGViewerFlash):void {
+
+				clearSvgViewer();
+
+				svgv.viewer = svgAtlas;
+				svgv.addChild(svgAtlas);
+				
+				var myheight:Number = svgAtlas.svgRoot.getHeight();
+				var mywidth:Number = svgAtlas.svgRoot.getWidth();
+				if (myheight > 0)
+					_originalHeight = myheight;
+				else
+					_originalHeight = svgv.height;
+				if (mywidth > 0)
+					_originalWidth = mywidth;
+				else
+					_originalWidth = svgv.width;
+				
+				var scale:Number = svgframe.width / _originalWidth - 0.05; 
+				svgv.scaleX = scale;
+				svgv.scaleY = scale;
+			}
+			
+			private function getSvgViewer():SVGViewerFlash {
+				if (isSvgViewerSet())
+					return svgv.viewer;
+				return null;
+			}
+						
+			private function clearSvgViewer():void {
+				if (!svgv)
+					initSvgViewer();
+				
+				if (svgv.viewer) {
+
+					if (svgv.viewer.parent == svgv)
+						svgv.removeChild(svgv.viewer);							
+					svgv.viewer = null;
+					
+				}
+			}
+			
+			private function initSvgViewer():void {
+//				if (_progressIndicator) {
+//					svgframe.removeChild(_progressIndicator);
+//					_progressIndicator = null;
+//				}
+//				
+				if (!svgv) {
+					svgv = new SVGViewerFlex();
+					svgv.percentHeight = 100;
+					svgv.percentWidth = 100;					
+				}
+				
+				if (!svgframe.contains(svgv))
+					svgframe.addChild(svgv);
+
+			}
+			
+			private function isSvgViewerSet():Boolean {
+				return svgv
+					&& svgv.viewer 
+					&& svgv.viewer.svgRoot 
+					&& svgv.viewer.svgRoot.xml 
+					&& svgv.viewer.svgRoot.topSprite 
+					&& svgv.viewer.parent == svgv;
+			}
+			
+			private function createSvgLayer():SVGGroupNode {
+				var dmPlate:DataMapPlate = DataMapPlate(data);
+				var svgViewer:SVGViewer = new SVGViewer();
+				svgViewer.xml = new XML(dmPlate.coronalLayerImageLoad);
+				return SVGUtils.findTopGroup(svgViewer.svgRoot);
+			}
+
+//			private function createSvgLayer():SVGGroupNode {
+//				var dmPlate:DataMapPlate = DataMapPlate(data);
+//				var svgViewer:SVGViewer = new SVGViewer();
+//				svgViewer.xml = new XML(dmPlate.coronalLayerImageLoad);
+//				return SVGUtils.findgroup(svgViewer.svgRoot, dmPlate.parent.name);
+//			}
+
+			private function getSvgAtlasLayer(svgAtlas:SVGViewer):SVGGroupNode {
+
+				var svgAtlasLayer:SVGGroupNode = SVGUtils.findgroup( svgAtlas.svgRoot, "atlas");
+
+				return svgAtlasLayer;
+			}
+
+			private function onIOError(event:IOErrorEvent):void {
+				trace("IOError: " + event.text);
+			}
+			
+			private function onSecurityError(event:SecurityErrorEvent):void {
+				trace("SecurityError: " + event.text);
+			}
+			
+//			private function setProgressIndicator():void {
+//				if (svgv) {
+//					svgframe.removeChild(svgv);
+//					svgv = null;
+//				}
+//				
+//				if (! _progressIndicator) {
+//					_progressIndicator = new ProgressBar();
+//					_progressIndicator.indeterminate = true;
+//					_progressIndicator.setStyle("verticalCenter",0);
+//					_progressIndicator.setStyle("left",10);
+//					_progressIndicator.setStyle("right",10);
+//				}
+//				if (!svgframe.contains(_progressIndicator))
+//					svgframe.addChild(_progressIndicator);
+//			}
+
+			protected function svgframe_resizeHandler(event:ResizeEvent):void
+			{
+				if (svgv) {
+					var scale:Number = svgframe.width / _originalWidth - 0.05;
+					svgv.scaleX = scale;
+					svgv.scaleY = scale;
+				}
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Label id="plateLabel" text="{data.atlasPlateName}" fontSize="9" top="5"/>	
+	<mx:Canvas id="svgframe" top="30" bottom="10" left="10" right="10"
+			   resize="svgframe_resizeHandler(event)">
+<!--
+		<svgweb:SVGViewerFlex id="svgv" height="100%" width="100%" />
+-->
+	</mx:Canvas>
+	
+
+</mx:Canvas>

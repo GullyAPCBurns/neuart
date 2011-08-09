@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="22">
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsViewItem;
+			
+			import mx.events.ColorPickerEvent;
+			
+			protected function colorPicker_changeHandler(event:ColorPickerEvent):void
+			{
+				var dmi:DataMapsViewItem = data as DataMapsViewItem;
+				if (dmi) {
+					dmi.color = event.color;
+				} else
+					trace("Data is not a DataMapsViewItem in DataMapHandlerItem");
+			}
+			
+
+			protected function visibleChBox_changeHandler(event:Event):void
+			{
+				var dmi:DataMapsViewItem = data as DataMapsViewItem;
+				if (dmi) {
+					dmi.visible = visibleChBox.selected;
+				} else
+					trace("Data is not a DataMapsViewItem in DataMapHandlerItem");
+			}
+
+		]]>
+		
+	</mx:Script>
+	<mx:CheckBox id="visibleChBox" label="{data.datamap.name}" width="100%" height="100%"
+				 selected="{data.visible}" change="visibleChBox_changeHandler(event)"/>
+	<mx:ColorPicker id="colorPicker" selectedColor="{data.color}" change="colorPicker_changeHandler(event)"/>	
+</mx:HBox>
