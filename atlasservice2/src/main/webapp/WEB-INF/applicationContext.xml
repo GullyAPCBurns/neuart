@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xmlns:sws="http://www.springframework.org/schema/web-services"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:sec="http://www.springframework.org/schema/security"
+	xsi:schemaLocation="http://www.springframework.org/schema/web-services http://www.springframework.org/schema/web-services/web-services-1.5.xsd
+		http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-3.0.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd">
+
+	<!--
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+		Base Beans
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-->
+
+	<context:annotation-config />
+ 
+ 	<bean class="org.springframework.beans.factory.annotation.RequiredAnnotationBeanPostProcessor"/>  
+
+    <context:component-scan base-package="edu.isi.bmkeg" />     
+ 
+    <!--
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+		Properties File
+		- this is the' bmkeg.properties'
+		  file located in ${contextParameters.homedirectory}.
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-->
+	
+	<!--
+	 
+	 This element defines the 'homedir' context variable which contains the URL of a directory 
+	 containing configuration files. This directory should be located outside the 
+	 webapp's directory to avoid overwriting the changes that users 
+	 made to these property files in successive deployments of newer versions of
+	 this webapp. 
+	
+	 The value of 'homedir' is taken from the web app's context parameter 'homedirectory'.
+	 This parameter can be defined in the webapp deployment file web.xml, but a better
+	 option is to define it in the webapp context file which it is included in
+	 src/main/webapp/META-INF/context.xml. Defining this parameter in the context file is better
+	 than defining it in the web.xml file because changes made to this file after deployment 
+	 won't be overwritten in successive deployments of newer versions of this webapp.
+	
+	 [Currently the value of 'homedir' is taken from the web app's context parameter 'homedirectory'
+	 but we should extend this to also include other sources like environment variables]
+
+	-->
+	<bean id="evaluationContext" class="org.springframework.expression.spel.support.StandardEvaluationContext">
+		<property name="variables">
+			<map>
+				<entry key="homedir" value="#{contextParameters.homedirectory}" />
+			</map>
+		</property>
+	</bean>
+	
+	<bean id="propertyPlaceholderConfigurer"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>#{evaluationContext.lookupVariable('homedir')}/bmkeg.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<bean id="bmkegProperties" class="edu.isi.bmkeg.utils.springContext.BmkegProperties">
+		<property name="homeDirectory" value="#{evaluationContext.lookupVariable('homedir')}"/>
+		<property name="dbDriver" value="${bmkeg.dbDriver}"/>
+		<property name="dbUrl" value="${bmkeg.dbUrl}"/>
+		<property name="dbUser" value="${bmkeg.dbUser}"/>
+		<property name="dbPassword" value="${bmkeg.dbPassword}"/>
+		<property name="persistenceUnitName" value="${bmkeg.persistenceUnitName}"/>
+	</bean>
+    
+</beans>
