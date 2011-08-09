@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+Main application component. It provides a GUI and an API for adding/closing 
+atlases, opening plates in windows, etc.
+-->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:views="edu.isi.bmkeg.neuart.atlasbrowser.views.*" 
+		   xmlns:tabbedwindows="edu.isi.bmkeg.neuart.tabbedwindows.*"
+		   width="1016.5152" height="668.1061" initialize="init(event)"
+		   creationComplete="creationCompleteHandler(event)"
+		   >
+
+	<mx:XML id="configuration" source="configuration.xml"/>
+
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.BioscholarModel;
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.DataMapEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.TabbedWindowEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.BrowserModel;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsViewItem;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasDescription;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMap;
+			import edu.isi.bmkeg.neuart.kefed.ExperimentView;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.Application;
+			import mx.core.Container;
+			import mx.core.FlexGlobals;
+			import mx.core.IContainer;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.PropertyChangeEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			public static const DEFAULT_ATLAS_URI:String = "http://bmkeg.isi.edu/atlas/swanson2004";
+
+			private var _atlasChooserWindow:AtlasChooser;
+			private var _dataMapChooserWindow:DataMapChooser;
+			private var _datamapClickHandler_dmi:DataMapsViewItem;
+			
+			private var _atlasServiceRO:RemoteObject;
+			
+			private function get atlasServiceRO():RemoteObject {
+				if (_atlasServiceRO == null) {
+					_atlasServiceRO = new RemoteObject(); 
+					_atlasServiceRO.destination = 	BrowserModel.ATLAS_SERVICE_DEST; 
+					_atlasServiceRO.endpoint = Utils.getRemotingEndpoint();
+					_atlasServiceRO.addEventListener(FaultEvent.FAULT, handleFault); 
+				}
+				return _atlasServiceRO;
+			}
+			
+			public static var instance:AtlasBrowserFramework = null;
+
+			/**
+			 * Opens an Atlas and adds it into the browser framework. Multiple 
+			 * Atlas can be opened simultaneously
+			 */
+			// TODO check that Atlas has not been already open
+			public function  openAtlas(atlas:AtlasStructure):void {
+				BrowserModel.loadedAtlases.addItem(atlas);				
+			}
+			
+			/**
+			 * Opens a DataMap and adds it into the browser framework. Multiple 
+			 * Data Maps can be opened simultaneously
+			 */
+			// TODO check that DataMap has not been already open
+			public function  openDataMap(datamap:DataMap):void {
+				BrowserModel.loadedDataMaps.addDataMap(datamap);
+			}
+			
+			/**
+			 * Closes a DataMap and removes it from the browser framework. 
+			 */
+			public function  closeDataMap(datamap:DataMap):void {
+				BrowserModel.loadedDataMaps.removeDataMap(datamap);
+			}
+			
+			/**
+			 * Opens or focuses if already openned an atlas plate in a Coronal Viewer Window.
+			 */
+			public function  openCoronalViewerWindow(atlasPlate:AtlasPlate):void {
+				var window:ViewerWindow =
+					findCoronalViewerWindow(
+						atlasPlate.parent.atlasURI,
+						atlasPlate.plateName);
+				if (window == null) {
+					window = ViewerWindow.createViewerWindow(atlasPlate);
+					tabbedGroups.openTabbedWindow(window);
+				}
+				setFocusToWindow(window);
+			}
+
+			/**
+			 * fetch an atlas from the server and opens it
+			 */
+			// TODO check that atlas has not been already open
+			public function loadAtlas(atlasUri:String):void {
+				atlasServiceRO.getdAtlasStructure.addEventListener(ResultEvent.RESULT, handleLoadAtlasResult); 
+				atlasServiceRO.getdAtlasStructure(atlasUri);
+			}
+
+			/**
+			 * fetch a DataMap from the server and opens it
+			 */
+			// TODO check that DataMap has not been already open
+			public function loadDataMap(dataMapUri:String):void {
+				atlasServiceRO.getDataMap.addEventListener(ResultEvent.RESULT, handleLoadDataMapResult); 
+				atlasServiceRO.getDataMap(dataMapUri);
+			}
+			
+			/**
+			 * Opens or focuses if already openned an experiment in a Viewer Window.
+			 */
+			public function  openExperimentViewerWindow(experimentUid:String):void {
+				var window:ExperimentView =
+					findExperimentViewerWindow(experimentUid);
+				if (window == null) {
+					window = ExperimentView.createExperimentView(experimentUid);
+					tabbedGroups.openTabbedWindow(window);
+				}
+				setFocusToWindow(window);
+			}
+
+			
+			private function handleLoadDataMapResult(ev:ResultEvent):void {
+				var dataMap:edu.isi.bmkeg.neuart.atlasservice.DataMap  = ev.result as edu.isi.bmkeg.neuart.atlasservice.DataMap;
+				if (dataMap) openDataMap(dataMap);
+			}
+
+			private function handleLoadAtlasResult(ev:ResultEvent):void {
+				var atlasStructure:edu.isi.bmkeg.neuart.atlasservice.AtlasStructure  = ev.result as edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+				if (atlasStructure) openAtlas(atlasStructure);
+			}
+			
+			private function handleFault(ev:FaultEvent):void {
+				Alert.show("Error: "
+					+ ev.fault.faultCode + " - " 
+					+ ev.fault.faultDetail + " - "
+					+ ev.fault.faultString);
+			}
+
+			public function openDataMapPlateTiles(datamap:DataMap):void {
+				var window:DataMapPlateTiles =
+					findDataMapPlateTiles(datamap.uri);
+				if (window == null) {
+					window = new DataMapPlateTiles();
+					window.datamap = datamap;
+					window.percentHeight = 100;
+					window.percentWidth = 100;
+					window.addEventListener(AtlasEvent.ATLAS_PLATE_CLICK,atlasPlateClickHandler);
+					tabbedGroups.openTabbedWindow(window);
+				}
+				setFocusToWindow(window);					
+			}
+			
+			public function openDataMapBrainRegionWindow(datamapUri:String, brainRegionAbbrevs:Array):void {
+				var window:DataMapBrainRegionWindow =
+					findDataMapBrainRegionWindow(datamapUri, brainRegionAbbrevs);
+				if (window == null) {
+					window = new DataMapBrainRegionWindow();
+					window.datamapUri = datamapUri;
+					window.brainRegionAbbrevs = brainRegionAbbrevs;
+					window.percentHeight = 100;
+					window.percentWidth = 100;
+					window.addEventListener(AtlasEvent.ATLAS_PLATE_CLICK,atlasPlateClickHandler);
+					tabbedGroups.openTabbedWindow(window);
+				}
+				setFocusToWindow(window);					
+			}	
+			
+			public function findDataMapBrainRegionWindow(datamapUri:String, brainRegionAbbrevs:Array):DataMapBrainRegionWindow {
+				for each (var window:Container in tabbedGroups.getWindows()) {
+					var dw:DataMapBrainRegionWindow = window as DataMapBrainRegionWindow;
+					if (dw && dw.datamapUri == datamapUri && Utils.sameArray(dw.brainRegionAbbrevs, brainRegionAbbrevs))
+						return dw;
+				}
+				return null;
+			}
+			
+			public function findCoronalViewerWindow(atlasURI:String, plateName:String):ViewerWindow {
+				for each (var window:Container in tabbedGroups.getWindows()) {
+					var vw:ViewerWindow = window as ViewerWindow;
+					if (vw && vw.atlasPlate.plateName == plateName &&
+						vw.atlasPlate.parent.atlasURI == atlasURI)
+						return vw;
+					
+				}
+				return null;
+			}
+
+			public function findExperimentViewerWindow(experimentUid:String):ExperimentView {
+				for each (var window:Container in tabbedGroups.getWindows()) {
+					var vw:ExperimentView = window as ExperimentView;
+					if (vw && vw.experimentUid == experimentUid)
+						return vw;
+					
+				}
+				return null;
+			}
+			
+			public function findDataMapPlateTiles(datamapURI:String):DataMapPlateTiles {
+				for each (var window:Container in tabbedGroups.getWindows()) {
+					var dw:DataMapPlateTiles = window as DataMapPlateTiles;
+					if (dw && dw.datamap.uri == datamapURI)
+						return dw;
+				}
+				return null;
+			}
+			
+			
+			/**
+			 * Selects the tab corresponding to the indicated window.
+			 */
+			public function setFocusToWindow(window:Container):void {
+				tabbedGroups.setFocusToWindow(window);
+			} 
+			
+			/**
+			 * Closes Tabbed Window
+			 */
+			public function closeTabbedWindow(window:Container):void {
+				tabbedGroups.closeTabbedWindow(window);
+			}
+			
+			/**
+			 * Handles coronalPlateSelector.clickAddAtlas event.
+			 * 
+			 * It pops up a window for the user to select an atlas to open.
+			 */
+			protected function coronalPlateSelector_clickOpenAtlasHandler(event:Event):void
+			{
+				_atlasChooserWindow = AtlasChooser(PopUpManager.createPopUp(this, AtlasChooser, true));
+				_atlasChooserWindow.addEventListener(AtlasChooser.SELECTED_ATLAS,clickOpenAtlas_atlasSelectedHandler,false,0,true);
+			}
+			
+			/**
+			 * Handles the AtlasChooser.atlasSelected event (AtlasEvent.SELECTED) 
+			 * for the AtlasChooser created to handle the coronalPlateSelector.clickOpenAtlas event
+			 * 
+			 * It will initiate a webservice call to load the selected atlas.
+			 */
+			protected function clickOpenAtlas_atlasSelectedHandler(event:AtlasEvent):void
+			{
+				var selectedAtlasURI:String = event.atlasURI;
+				if (selectedAtlasURI != null) 
+				{
+					var atlas:edu.isi.bmkeg.neuart.atlasservice.AtlasStructure = BrowserModel.loadedAtlases.getAtlas(selectedAtlasURI);
+					if (atlas != null) {
+						Alert.show("Atlas " + atlas.atlasDescription +" is already open");					
+					}
+					else 
+					{
+						loadAtlas(selectedAtlasURI);
+					}
+				} 	
+			}
+
+			protected function coronalPlateSelector_clickCloseAtlasHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+			protected function clickOpenDataMap_dataMapSelectedHandler(event:DataMapEvent):void {
+				//				Alert.show("Received DataMapEvent: " + event.datamapURI);
+				var selectedDatamapURI:String = event.datamapURI;
+				if (selectedDatamapURI != null) 
+				{
+					var dmi:DataMapsViewItem = BrowserModel.loadedDataMaps.getDataMap(selectedDatamapURI)
+					if (dmi != null) 
+						Alert.show("Data Map " + dmi.datamap.name + " is already open");					
+					else 
+					{
+						loadDataMap(selectedDatamapURI);
+					}
+				} 	
+			}
+
+			protected function atlasPlateClickHandler(event:AtlasEvent):void
+			{
+				var atlas:edu.isi.bmkeg.neuart.atlasservice.AtlasStructure = BrowserModel.loadedAtlases.getAtlas(event.atlasURI);
+				
+				if (atlas == null) {
+					Alert.show("Could not find atlas: " + event.atlasURI);
+				} else {
+					var plate:AtlasPlate = atlas.plateNamed(event.plateName);
+					if (plate == null) {
+						Alert.show("Could not find plate: " + event.atlasURI + "#" + event.plateName);
+					} else {
+						openCoronalViewerWindow(plate);
+					}					
+				}
+			}
+			
+			protected function dataMapClickHandler(event:DataMapEvent):void
+			{
+				var dmi:DataMapsViewItem = BrowserModel.loadedDataMaps.getDataMap(event.datamapURI);
+				
+				if (dmi == null) {
+					Alert.show("Could not find Data Map: " + event.datamapURI);
+				} else {
+					_datamapClickHandler_dmi = dmi;
+					Alert.show("The requested operation might take several minutes to execute. " +
+						"During this time the application will be unresponsive. " +
+						"We are working on resolving this issue",
+						"Alert",Alert.OK | Alert.CANCEL, this, alertClickHandler);
+				}
+			}
+
+			private function alertClickHandler(event:CloseEvent):void {
+				if (event.detail ==  Alert.OK) {
+					openDataMapPlateTiles(_datamapClickHandler_dmi.datamap);	
+				}				
+			}
+			
+			protected function tabbedGroups_closeClickHandler(event:TabbedWindowEvent):void
+			{
+				closeTabbedWindow(event.tabbedWindow);
+			}
+
+
+			protected function dataMapSelector_clickOpenDataMapHandler(event:Event):void
+			{
+				_dataMapChooserWindow = DataMapChooser(PopUpManager.createPopUp(this, DataMapChooser, true));
+				_dataMapChooserWindow.openAtlases = BrowserModel.loadedAtlases;
+				_dataMapChooserWindow.addEventListener(DataMapChooser.SELECTED_DATA_MAP,clickOpenDataMap_dataMapSelectedHandler,false,0,true);
+			}
+
+
+			protected function dataMapSelector_clickCloseDataMapHandler(event:Event):void
+			{
+				var dm:DataMap = datamapHandler.selectedDataMap;
+				if (dm)
+					closeDataMap(dm);
+			}
+
+
+			protected function tabbedGroups_creationCompleteHandler(event:FlexEvent):void
+			{
+				//TODO Add a Menu option to open the ConnectivityWindow instead of always open it at startup
+//				var startPage:Container = new StartWindow();
+				var startPage:Container = new ConnectivityWindow();
+				startPage.percentWidth=100;
+				startPage.percentHeight=100;
+				tabbedGroups.openTabbedWindow(startPage);
+			}
+
+
+			protected function init(event:FlexEvent):void
+			{
+				instance = this;
+				BioscholarModel.instiantiate(FlexGlobals.topLevelApplication.url, configuration);
+			}
+
+
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				// Automatically opens the default atlas
+				loadAtlas(DEFAULT_ATLAS_URI);
+			}
+
+		]]>
+	</mx:Script>
+	
+
+	<mx:Label text="NeuARt Atlas Browser" width="254" height="24" fontWeight="bold" 
+			  fontFamily="Verdana" fontSize="18" top="5" horizontalCenter="18"
+			  textAlign="center" />
+	<mx:HBox left="10" top="50" bottom="5" right="10" horizontalScrollPolicy="off"
+			 verticalScrollPolicy="off">
+		<views:CoronalPlateSelector id="coronalPlateSelector" height="100%" 
+									width="255.45456" verticalScrollPolicy="off" 
+									borderStyle="outset" 
+									clickOpenAtlas="coronalPlateSelector_clickOpenAtlasHandler(event)"
+									clickCloseAtlas="coronalPlateSelector_clickCloseAtlasHandler(event)" 
+									openAtlases="{BrowserModel.loadedAtlases}" horizontalScrollPolicy="off" 
+									atlasPlateClick="atlasPlateClickHandler(event)" />
+		<mx:HDividedBox width="100%" height="100%">			
+			<mx:VDividedBox  width="100%" height="100%">
+				<views:SagittalPlateSelector width="100%" height="235" borderStyle="outset"  
+											 id="sagittalPlateSelector" 
+											 openAtlases="{BrowserModel.loadedAtlases}"
+											 atlasPlateClick="atlasPlateClickHandler(event)" />
+				<tabbedwindows:WindowsTabbedGroupsMgr width="100%" height="100%" borderStyle="outset" 
+										   id="tabbedGroups" 
+										   closeClick="tabbedGroups_closeClickHandler(event)" 
+										   creationComplete="tabbedGroups_creationCompleteHandler(event)"/>
+			</mx:VDividedBox>
+			
+			
+			<mx:Canvas id="dataMapsPane" height="100%" width="301" 
+									borderStyle="outset" verticalScrollPolicy="off">
+				<mx:Label text="Loaded Data Maps" left="10" right="10" top="5" textAlign="center" fontWeight="bold"/>
+				<mx:VDividedBox top="22" bottom="10" left="0" right="0">
+					<views:DataMapNavigator width="100%" height="100%" datamaps="{BrowserModel.loadedDataMaps}"
+											atlasPlateClick="atlasPlateClickHandler(event)"
+											dataMapClick="dataMapClickHandler(event)"/>
+					<views:DataMapHandler id="datamapHandler" width="100%" height="200" 
+										  clickOpenDataMap="dataMapSelector_clickOpenDataMapHandler(event)"
+										  clickCloseDataMap="dataMapSelector_clickCloseDataMapHandler(event)" 										  
+										  datamaps="{BrowserModel.loadedDataMaps}" />
+				</mx:VDividedBox>
+	
+			</mx:Canvas>
+		</mx:HDividedBox>		
+	</mx:HBox>
+
+</mx:Canvas>
+

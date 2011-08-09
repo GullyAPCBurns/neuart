@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:views="edu.isi.bmkeg.neuart.atlasbrowser.views.*"  
+		   width="164" height="122" toolTip="{data.plateName + ' [' + data.sagitalZOffsetFromLeft + ' mm]'}" >
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+		]]>
+	</mx:Script>
+	<mx:Image source="{Utils.insertWebContextUrl(data.coronalThumbnailURI)}" width="126" height="99" horizontalCenter="0" 
+			  scaleContent="true" autoLoad="true" y="2" />	
+	<mx:Label text="{data.plateName}" fontSize="9" bottom="2" left="10" right="10"/>
+</mx:Canvas>

@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="860" height="500" verticalScrollPolicy="off"
+		   horizontalScrollPolicy="off" label="{brainRegionAbbrevsToString()}" initialize="initializeHandler(event)" >
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.BrowserModel;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsViewItem;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasService;
+			import edu.isi.bmkeg.neuart.atlasservice.BrainRegion;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMap;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMapPlate;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.listClasses.IListItemRenderer;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.ResizeEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.states.OverrideBase;
+			
+			private var _datamapUri:String;
+			private var _brainRegionAbbrevs:Array;
+			private var _datamap:DataMap;
+			private var _brainRegions:ArrayCollection;
+			private var _cachedLevelsBRs:ArrayCollection;
+			private var _cachedLevelsDM:DataMap;
+			
+			private var _atlasService:AtlasService;
+			
+			private function get atlasService():AtlasService {
+				if (!_atlasService) {
+					_atlasService = new AtlasService();
+					_atlasService.addGetBrainRegionEventHandler(ResultEvent.RESULT, handleLoadBrainRegionResult);
+					_atlasService.addGetDataMapEventHandler(ResultEvent.RESULT, handleLoadDataMapResult);					
+				}
+				return _atlasService;
+			}
+			
+			[Bindable]
+			private var _brainRegionLevels:ArrayCollection;
+			
+			[Bindable]
+			public function get datamap():DataMap {
+				return _datamap;
+			}			
+			
+			public function set datamap(dm:DataMap):void {
+				if (_datamap != dm) {
+					_datamap = dm;
+					invalidateProperties();
+				}
+			}
+			
+			/**
+			 * brainRegions is a n array of regions whose aggregated levels are going to
+			 * be displayed.
+			 */
+			public function get brainRegions():ArrayCollection {
+				return _brainRegions;
+			}
+			
+			public function set brainRegions(brs:ArrayCollection):void {
+				if (_brainRegions != brs) {
+					_brainRegions = brs;
+					invalidateProperties();
+				}
+			}
+			
+			public function brainRegionAddItem(br:BrainRegion):void {
+				if (! _brainRegions) {
+					_brainRegions = new ArrayCollection();
+				}
+				_brainRegions.addItem(br);
+				invalidateProperties();
+			}
+			
+			[Bindable]
+			private var _cachedDMSVGViewers:Object = new Object();
+			
+			public function get datamapUri():String {
+				return _datamapUri;
+			}
+			
+			public function set datamapUri(uri:String):void {
+				if (uri != _datamapUri) {
+					_datamapUri = uri;
+					var dmvi:DataMapsViewItem = BrowserModel.loadedDataMaps.getDataMap(uri);
+					if (dmvi) {
+						datamap = dmvi.datamap;
+					} else {
+						cancelOngoingDatamapRequest();
+						atlasService.getDataMap(uri);
+					}
+				}
+			}
+			
+			/**
+			 * brainRegionAbbrev is an array of abbreviations whos corresponding
+			 * brain region levels are going to be displayed.
+			 */
+			[Bindable]
+			public function get brainRegionAbbrevs():Array {
+				return _brainRegionAbbrevs;
+			}	
+			
+			public function set brainRegionAbbrevs(abbrevs:Array):void {
+				if (abbrevs) abbrevs = sortAbbrevs(abbrevs);
+				if ((abbrevs && !_brainRegionAbbrevs) ||
+					(!abbrevs && _brainRegionAbbrevs) ||
+					(abbrevs && _brainRegionAbbrevs && !Utils.sameArray(abbrevs,_brainRegionAbbrevs))) {
+
+					_brainRegionAbbrevs = abbrevs;
+					cancelOngoingBrainRegionRequest();
+					_brainRegions = new ArrayCollection();
+					if (_brainRegionAbbrevs) {
+						for each (var brAbbrev:String in _brainRegionAbbrevs) {
+							atlasService.getBrainRegion(brAbbrev, AtlasBrowserFramework.DEFAULT_ATLAS_URI);
+						} 
+					} 					
+				}
+			}
+			
+			private function sortAbbrevs(abbrevs:Array):Array {
+				// TODO implement sortAbbrevs
+				return abbrevs;
+			}
+			private function cancelOngoingDatamapRequest():void {
+				// TODO implement cancelOngoingDatamapRequest
+			}
+
+			private function cancelOngoingBrainRegionRequest():void {
+				// TODO implement cancelOngoingBrainRegionRequest
+			}
+
+			private function handleLoadDataMapResult(event:ResultEvent):void {
+				var dm:DataMap  = event.result as DataMap;
+				if (dm) {
+					AtlasBrowserFramework.instance.openDataMap(dm);
+					datamap  = dm;
+				} else {
+					// TODO Error - DM doesn't exists
+				}
+			}
+			
+			private function handleLoadBrainRegionResult(event:ResultEvent):void {
+				var br:BrainRegion  = event.result as BrainRegion;
+				if (br) {
+					brainRegionAddItem(br);
+				} else {
+					// TODO error - Failed to access brain region 
+				}
+			}
+
+//			protected override function commitProperties():void {
+//				super.commitProperties();
+//				if (_datamap && _brainRegions &&
+//					_brainRegions.length == _brainRegionAbbrevs.length) 
+//					if (_datamap != _cachedLevelsDM || 
+//						!Utils.sameArray(_brainRegions.toArray(), _cachedLevelsBRs.toArray())) {
+//						updateBRLevels();
+//						label = brainRegionAbbrevsToString() + " - " + _datamap.name;
+//						updateBrainRegionLabels();
+//						_cachedLevelsBRs = _brainRegions;
+//						_cachedLevelsDM = _datamap;
+//					}
+//			}
+//			
+
+			protected override function commitProperties():void {
+				super.commitProperties();
+				if (_datamap && _brainRegions &&
+					_brainRegions.length == _brainRegionAbbrevs.length) 
+					if (_datamap != _cachedLevelsDM || 
+						!Utils.sameArray(_brainRegions.toArray(), _cachedLevelsBRs.toArray())) {
+						updateBRLevels();
+						label = brainRegionAbbrevsToString() + " - " + _datamap.name;
+						updateBrainRegionLabels();
+						_cachedLevelsBRs = _brainRegions;
+						_cachedLevelsDM = _datamap;
+					}
+			}
+			
+			
+			private function brainRegionAbbrevsToString():String {
+				var abbrevs:String = "";
+				for (var i:int = 0; i < brainRegionAbbrevs.length; i++) {
+					var abbrev:String = brainRegionAbbrevs[i];
+					if (i > 0) abbrevs += ", ";
+					abbrevs += abbrev;
+				}	
+				return abbrevs;
+			}
+			
+			private function updateBrainRegionLabels():void {
+				brlabels.removeAllChildren();
+				var lb:Label = new Label();
+				if (brainRegions.length > 1) {
+					lb.text = "Brain Regions:";
+				} else {
+					lb.text = "Brain Region:";
+				}
+				brlabels.addChild(lb);
+				for each (var br:BrainRegion in brainRegions) {
+					lb = new Label();
+					lb.text = br.abbreviation + " - " + br.description;
+					brlabels.addChild(lb);
+				}
+			}
+			
+			private function updateBRLevels():void {
+				// Compute min/max levels for the brainRegions set
+				var minlevel:int = BrainRegion(brainRegions[0]).atlasMinLevel;
+				var maxlevel:int = BrainRegion(brainRegions[0]).atlasMaxLevel;
+				for (var i:int = 1; i< brainRegions.length; i++) {
+					if (BrainRegion(brainRegions[i]).atlasMinLevel < minlevel)
+						minlevel = BrainRegion(brainRegions[i]).atlasMinLevel;
+					if (BrainRegion(brainRegions[i]).atlasMaxLevel < maxlevel)
+						maxlevel = BrainRegion(brainRegions[i]).atlasMaxLevel;
+				}
+				
+				
+				// Extracts datamap levels contained in the min/max levels range
+				var dmlevels:ArrayCollection = new ArrayCollection();
+				for each (var dmPl:DataMapPlate in datamap.sortedPLates) {
+					 var level:int = dmPl.getAtlasPlateLevel(); 
+					if (level >= minlevel &&
+						level <= maxlevel) {
+						dmlevels.addItem(dmPl);						
+					}
+				 }
+				 _brainRegionLevels = dmlevels;
+			}
+
+			private function resizeHandler(event:ResizeEvent):void
+			{
+				plates.height = frame.height - 5;
+			
+			}
+
+			private function plates_itemClickHandler(event:ListEvent):void
+			{
+				var dmplate:DataMapPlate;
+				var ir: IListItemRenderer = event.itemRenderer;
+				if (ir) {
+					dmplate = ir.data as DataMapPlate;
+					if (dmplate) {
+						var plate:AtlasPlate = dmplate.atlasPlate;
+						var atlasEvent:AtlasEvent = new AtlasEvent(AtlasEvent.ATLAS_PLATE_CLICK,plate.parent.atlasURI, plate.plateName);
+						dispatchEvent(atlasEvent);						
+					}
+				}
+			}
+			
+
+
+
+			protected function initializeHandler(event:FlexEvent):void
+			{
+				// Initialize plates item renderer
+				var dmpRenderer:ClassFactory = new ClassFactory(DataMapPlateTile);
+				dmpRenderer.properties = { cachedDMSVGViewers: _cachedDMSVGViewers };
+				plates.itemRenderer = dmpRenderer;
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Metadata>
+		[Event(name="atlasPlateClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent")]
+	</mx:Metadata>
+	<mx:VBox id="brlabels">		
+	</mx:VBox>
+	<mx:HBox>
+		<mx:Label text="Data Map: " />
+		<mx:Text text="{datamap.name}"/>
+	</mx:HBox>		
+	<mx:VBox id="frame" height="100%" width="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off" resize="resizeHandler(event)" >
+		<mx:TileList id="plates"
+					 dataProvider="{_brainRegionLevels}" wordWrap="true" 
+					 direction="horizontal"  horizontalScrollPolicy="off"
+					 verticalScrollPolicy="auto" columnCount="0"
+					 rowCount="0" columnWidth="{tileWidth.value}" rowHeight="{tileWidth.value}" 
+					 width="100%" height="100%" itemClick="plates_itemClickHandler(event)"
+					 liveScrolling="false" />		
+	</mx:VBox>
+	<mx:HSlider id="tileWidth" minimum="200" maximum="600" liveDragging="false"
+				value="200" showDataTip="false" />
+	
+</mx:VBox>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+Component for selecting a DataMap from the atlasservice.
+It dispatches the SELECTED_DATA_MAP event of type 
+edu.isi.bmkeg.neuart.atlasbrowser.events.DataMapEvent.
+-->
+<mx:TitleWindow xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				layout="absolute" 
+				width="400" height="300" title="Select a Data Map" 
+				showCloseButton="true" close="closeWindow(event)" 
+				xmlns:atlasserver="services.atlasserver.*">
+	<fx:Declarations> 
+		<mx:RemoteObject 
+			id="atlasService" 
+			destination="{BrowserModel.ATLAS_SERVICE_DEST}" 
+			endpoint="{Utils.getRemotingEndpoint()}" 
+			showBusyCursor="true">
+			<mx:method name="listAvailableDataMaps" 
+					   fault="listAvailableDataMapsFailHandler(event)"
+					   result="ListAvailableDataMapsResult_resultHandler(event)" >
+			</mx:method>
+		</mx:RemoteObject>
+		
+	</fx:Declarations> 
+	<fx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.DataMapEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.Atlases;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.BrowserModel;
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+			
+			import mx.collections.ICollectionView;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.events.FaultEvent;
+			
+			import edu.isi.bmkeg.neuart.atlasservice.DataMapDescription;
+			
+			public static const SELECTED_DATA_MAP:String = "selectedDataMap";
+			
+			private var _openAtlases:Atlases;
+			
+			[Bindable]
+			public function get openAtlases():Atlases {
+				return _openAtlases;
+			} 
+			
+			public function set openAtlases(value:Atlases):void {
+				_openAtlases = value;
+			}
+			
+			private function closeWindow(event:CloseEvent):void 
+			{
+				cancel();	
+			}
+
+
+			private function cancelButton_clickHandler(event:MouseEvent):void
+			{
+				cancel();
+			}
+
+			private function listAvailableDataMapsFailHandler(event:FaultEvent):void  
+			{ 
+				Alert.show(event.fault.faultString + '\n' + event.fault.faultDetail);
+			} 		
+
+			private function openButton_clickHandler(event:MouseEvent):void
+			{
+				var selectedDataMap:Object = datamapsList.selectedItem;
+				var selectedEvent:DataMapEvent = 
+					new DataMapEvent(SELECTED_DATA_MAP,selectedDataMap.uri);
+				PopUpManager.removePopUp(this);
+				dispatchEvent(selectedEvent);
+			}
+			
+			private function cancel():void
+			{
+				PopUpManager.removePopUp(this);	
+			}
+
+			
+			private function datamapsList_creationCompleteHandler(event:FlexEvent):void
+			{
+				issueListAvailableDataMapsRequest();
+			}
+			
+			private function issueListAvailableDataMapsRequest():void {
+				if (atlasSelector.selectedIndex >= 0) {
+					var atlasURI:String = AtlasStructure(openAtlases.getItemAt(atlasSelector.selectedIndex)).atlasURI;
+					atlasService.listAvailableDataMaps(atlasURI);
+				}
+			}
+
+			protected function atlasSelector_changeHandler(event:ListEvent):void
+			{
+				issueListAvailableDataMapsRequest();
+			}
+
+
+			private function generateDataMapLabel(dm:Object):String {
+				var label:String = dm.name;
+				if (dm.description)
+					label = label + " - " + dm.description;
+				return label;
+			}
+
+			protected function ListAvailableDataMapsResult_resultHandler(event:ResultEvent):void
+			{
+				datamapsList.dataProvider = event.result;
+				var listview:ICollectionView = datamapsList.dataProvider as ICollectionView;			
+				var sort:Sort = new Sort();
+				sort.fields = [new SortField("name")];
+				listview.sort = sort;
+				listview.refresh();
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Metadata>
+		[Event(name="selectedDataMap",type="edu.isi.bmkeg.neuart.atlasbrowser.events.DataMapEvent")]
+	</fx:Metadata>
+	<mx:ComboBox id="atlasSelector" left="10" right="10" top="10" prompt="Select an Atlas"
+				 dataProvider="{openAtlases}" change="atlasSelector_changeHandler(event)"
+				 labelField="atlasName" 
+				 selectedIndex="{(openAtlases.length == 1)?0:-1}"/>
+	
+	<mx:List top="42" left="10" right="10" bottom="40" id="datamapsList"  
+			 creationComplete="datamapsList_creationCompleteHandler(event)"  
+			 labelFunction="generateDataMapLabel" />
+	<mx:Button label="Open" height="22" bottom="10" left="10" enabled="{datamapsList.selectedIndex >= 0}" id="openButton" 
+			   click="openButton_clickHandler(event)"/>
+	<mx:Button label="Cancel" bottom="10" left="85" click="cancelButton_clickHandler(event)" id="cancelButton" />
+	
+</mx:TitleWindow>

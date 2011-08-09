@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:svgweb="org.svgweb.*" 
+		   width="440" height="420"  horizontalScrollPolicy="off" 
+		   verticalScrollPolicy="off" implements="edu.isi.bmkeg.neuart.tabbedwindows.ITabbedWindow">
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.tabbedwindows.ITabbedWindow;
+			
+			import mx.core.Container;
+			import mx.events.FlexEvent;
+			import mx.events.SliderEvent;
+			
+			import org.svgweb.core.SVGViewer;
+			
+			private var _originalHeight:Number;
+			private var _originalWidth:Number;
+			private var _DMLayersHandler:ViewerWindowDMLayersHandler;
+	
+			private var _atlasPlate:AtlasPlate;
+
+			[Bindable]
+			public function get atlasPlate():AtlasPlate {
+				return _atlasPlate;
+			}
+			
+			public function set atlasPlate(p:AtlasPlate):void {
+				_atlasPlate = p;
+				label = computeLabel();
+			}
+			
+			public function get svgViewer():SVGViewer {
+				return svgv.viewer;	
+			}
+			
+			public static function createViewerWindow(atlasPlate:AtlasPlate):ViewerWindow {
+				var window:ViewerWindow = new ViewerWindow();
+				window.atlasPlate = atlasPlate;
+				window.percentHeight = 100;
+				window.percentWidth = 100;		
+				return window				
+			}
+			
+			/**
+			 * Implements the ITabbedWindow interface.
+			 */
+			public function duplicateWindow():Container {
+				return createViewerWindow(atlasPlate);
+			}
+			
+			private function computeLabel():String {
+				var l:String;
+				if (atlasPlate.parent == null)
+					l = "(No parent) " + atlasPlate.plateName;
+				else
+					l = atlasPlate.parent.atlasName + " - " + atlasPlate.plateName;
+				return l;
+			}
+
+			private function vbox1_creationCompleteHandler(event:FlexEvent):void
+			{
+				svgv.height = svgv.parent.height;
+				svgv.width = svgv.parent.width;
+				if (atlasPlate.coronalImageLoad)
+					processAtlasSVG();
+				else
+					loadAtlasPlateImageXML();					
+			}
+			
+			private function loadAtlasPlateImageXML():void {
+				
+				atlasPlate.addEventListener(Event.COMPLETE,onAtlasComplete);
+				atlasPlate.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				atlasPlate.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				
+				atlasPlate.loadCoronalImageXML();
+			}
+
+			private function onAtlasComplete(event:Event):void {
+				
+				atlasPlate.removeEventListener(Event.COMPLETE,onAtlasComplete);
+				atlasPlate.removeEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				atlasPlate.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				
+				processAtlasSVG();
+
+			}
+
+			private function processAtlasSVG():void {
+				svgv.viewer.xml = new XML(atlasPlate.coronalImageLoad);
+				var myheight:Number = svgv.viewer.svgRoot.getHeight();
+				var mywidth:Number = svgv.viewer.svgRoot.getWidth();
+				if (myheight > 0)
+					_originalHeight = myheight;
+				else
+					_originalHeight = svgv.height;
+				if (mywidth > 0)
+					_originalWidth = mywidth;
+				else
+					_originalWidth = svgv.width;
+				svgv.height = _originalHeight;
+				svgv.width = _originalWidth;
+				zoomSlider.value  = 0;
+				
+				// creates and inits Data Map Layers Handler
+				
+				_DMLayersHandler = new ViewerWindowDMLayersHandler(this);
+				_DMLayersHandler.init();
+
+			}
+			
+			private function onIOError(event:IOErrorEvent):void {
+				trace("IOError: " + event.text);
+			}
+			
+			private function onSecurityError(event:SecurityErrorEvent):void {
+				trace("SecurityError: " + event.text);
+			}
+			
+			private function zoomSlider_changeHandler(event:SliderEvent):void
+			{
+				var scale:Number = (zoomSlider.value == 0) ? 1 : (zoomSlider.value > 0) ? zoomSlider.value + 1 : 1 / (1 + (-1) * zoomSlider.value);
+				svgv.scaleX = scale;
+				svgv.scaleY = scale;
+			}
+			
+			private function myDataTipFormatter(value:Number):String { 
+				var scale:Number = (value == 0) ? 1 : (value > 0) ? value + 1 : 1 / (1 + (-1) * value);
+				var percentage:int = scale * 100;
+				return String(percentage) + "%";
+			}
+
+
+		]]>
+	</mx:Script>
+	<mx:Canvas top="20" bottom="45" left="10" right="10" 
+			   creationComplete="vbox1_creationCompleteHandler(event)">
+		<svgweb:SVGViewerFlex id="svgv" />	
+	</mx:Canvas>
+	<mx:HSlider right="10" bottom="10" id="zoomSlider" minimum="-4" maximum="4"
+				snapInterval="0.25" change="zoomSlider_changeHandler(event)"
+				liveDragging="true" labels="{new Array('20%', '100%', '500%')}"
+				tickValues="{new Array(-4, 0, 4)}" dataTipFormatFunction="myDataTipFormatter" />
+</mx:Canvas>

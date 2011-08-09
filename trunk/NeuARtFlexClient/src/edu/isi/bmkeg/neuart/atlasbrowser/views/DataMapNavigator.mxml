@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300">
+	
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.DataMapEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsView;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsViewItem;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMap;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMapPlate;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.events.ListEvent;
+			
+			public static const TYPE_ATLAS:String = "atlas";
+			public static const TYPE_GROUP:String = "group";
+			public static const TYPE_DATA_MAP:String = "datamap";
+			public static const TYPE_ATLAS_LEVEL:String = "atlaslevel";
+			
+			public static const GROUP_DATAMAPS:String = "datamaps";
+			public static const GROUP_LEVELS:String = "levels";
+			
+			private var _datamaps:DataMapsView;
+			
+			/**
+			 * _treemodel 
+			 * 
+			 * Example:
+			 *   - Atlas:Swanson 1998
+			 *     - DatamMaps
+			 *       - LSc.d PHAL
+			 *         - Level 15 
+			 *         - Level 21
+			 *         - Level 34
+			 *       - LSr.dl PHAL
+			 *         - Level 17
+			 *         - Level 21
+			 *     - Levels
+			 *       - Level 15 
+			 *         - LSc.d PHAL
+			 *       - Level 17
+			 *         - LSr.dl PHAL
+			 *       - Level 21
+			 *         - LSc.d PHAL
+			 *         - LSr.dl PHAL
+			 *       - Level 34
+			 *         - LSc.d PHAL
+			 * 
+			 *   - Atlas:Paxinos
+			 *     - DatamMaps
+			 *       
+			 *     - Levels
+			 * 
+			 * Structure: 
+			 *   type: {"atlas","group","datamap", "atlaslevel"}
+			 *   data: object
+			 *   label:
+			 *   children:
+			 * 
+			 */
+			[Bindable]
+			private var _treeModel:ArrayCollection;
+					
+			public function get datamaps():DataMapsView {
+				return _datamaps;
+			}
+			
+			public function set datamaps(value:DataMapsView):void {
+				if (_datamaps) 
+					_datamaps.removeEventListener(CollectionEvent.COLLECTION_CHANGE,datamaps_changeHandler);
+				_datamaps = value;
+				initTreeModel();
+				if (_datamaps)
+					_datamaps.addEventListener(CollectionEvent.COLLECTION_CHANGE,datamaps_changeHandler);
+			}
+			
+			private function initTreeModel():void {
+				if (_datamaps) {
+					_treeModel = generateTreeModel(); 
+				} else 
+					_treeModel = null;
+			}
+			
+			private function generateTreeModel():ArrayCollection {
+				var model:ArrayCollection = new ArrayCollection();
+				
+				for each (var dmi:DataMapsViewItem in _datamaps) {
+					pushDatamap(dmi,model);
+				}
+				
+				return model;
+			}
+			
+			/**
+			 * deploys datamap related nodes in the treemodel tree
+			 */
+			private function pushDatamap(dmi:DataMapsViewItem, model:ArrayCollection):void {
+				var atlas:AtlasStructure = dmi.datamap.atlas;
+				var atlasBranch:Object = null;
+				for each (var ab:Object in model) {
+					if (ab.data == atlas) {
+						atlasBranch = ab;
+						break;
+					}
+				}
+				if (atlasBranch == null) {
+					var datamapsGroup:Object = {
+						type: TYPE_GROUP,
+						data: GROUP_DATAMAPS,
+						label:"Data Maps",
+						children: new ArrayCollection()
+					};
+					var levelsGroup:Object = {
+						type: TYPE_GROUP,
+						data: GROUP_LEVELS,
+						label:"Levels",
+						children: new ArrayCollection()
+					};
+					atlasBranch = {
+						type: TYPE_ATLAS, 
+						data: atlas,
+						label: atlas.atlasName,
+						datamapsGroup: datamapsGroup,
+						leveslGroup: levelsGroup,
+						children: new ArrayCollection([datamapsGroup, levelsGroup])
+					};
+					model.addItem(atlasBranch);
+				}
+				pushDatamapIntoDatamapsGroup(dmi,atlasBranch.children[0]);
+				pushDatamapIntoLevelsGroup(dmi, atlasBranch.children[1]);
+			}
+			
+			/**
+			 * removes datamap related nodes in the treemodel tree
+			 */
+			private function popsDatamap(dmi:DataMapsViewItem, model:ArrayCollection):void {
+				var atlas:AtlasStructure = dmi.datamap.atlas;
+				var atlasBranch:Object = null;
+				for each (var ab:Object in model) {
+					if (ab.data == atlas) {
+						atlasBranch = ab;
+						break;
+					}
+				}
+				if (atlasBranch == null) {
+					trace("Atlas branch not found in postDatamap");
+					return;
+				}
+
+				var datamapsGroup:Object = atlasBranch.children[0];
+				var levelsGroup:Object = atlasBranch.children[1];
+				popsDatamapFromDatamapsGroup(dmi,datamapsGroup);
+				popsDatamapFromLevelsGroup(dmi,levelsGroup);
+
+				if (datamapsGroup.children.length == 0 &&
+					levelsGroup.children.length == 0) {
+					initTreeModel();
+				}
+			}
+			
+			private function popsDatamapFromDatamapsGroup(dmi:DataMapsViewItem,dmsGroup:Object):void {
+				var dmnode:Object = null;
+				var dmnodes:ArrayCollection = ArrayCollection(dmsGroup.children);
+				
+				for (var i:int = 0; i < dmnodes.length; i++) {
+					var n:Object = dmnodes[i];
+					if (n.data == dmi) {
+						
+						// Data Map node found. Removes it
+
+						dmnodes.removeItemAt(i);
+						break;
+					}	
+										
+				}
+			}
+
+			private function pushDatamapIntoDatamapsGroup(dmi:DataMapsViewItem,dmsGroup:Object):void {
+				var dmnode:Object = null;
+				var dmnodes:ArrayCollection = ArrayCollection(dmsGroup.children);
+				
+				for (var i:int = 0; i < dmnodes.length; i++) {
+					var n:Object = dmnodes[i];
+					if (n.data == dmi) {
+						
+						// Data Map is already a child of the Data Maps Group - Do nothing
+						
+						return;
+						
+					}	
+					
+					if (dmi.datamap.name < n.label) {
+						
+						// Data Map is not a child of the Data Maps Group and should be inserted at this position
+						
+						dmnode = {
+							type: TYPE_DATA_MAP,
+							data: dmi,
+							label: dmi.datamap.name,
+							children: createDatamapChildrenNodes(dmi)
+						};
+						dmnodes.addItemAt(dmnode, i);
+						return;						
+					}
+					
+				}
+				// Data Map is not a child of the Data Maps Group and should be inserted at the end
+
+				dmnode = {
+					type: TYPE_DATA_MAP,
+					data: dmi,
+					label: dmi.datamap.name,
+					children: createDatamapChildrenNodes(dmi)
+				};
+				dmnodes.addItem(dmnode);
+			}
+			
+			private function createDatamapChildrenNodes(dmi:DataMapsViewItem):ArrayCollection {
+				var nodes:ArrayCollection = new ArrayCollection();
+				for each (var level:DataMapPlate in dmi.datamap.sortedPLates) {
+					var n:Object = {
+						type: TYPE_ATLAS_LEVEL,
+						data: level.atlasPlate,
+						label: level.atlasPlate.plateName,
+						children: null
+					}
+					nodes.addItem(n);
+				}
+				return nodes;
+			}
+						
+			private function pushDatamapIntoLevelsGroup(dmi:DataMapsViewItem,levelsGroup:Object):void {
+				var levelnodes:ArrayCollection = ArrayCollection(levelsGroup.children);
+				for each (var dmp:DataMapPlate in dmi.datamap.sortedPLates) {
+					var levelnode:Object = null;				
+					for (var i:int = 0; i < levelnodes.length; i++) {
+						var n:Object = levelnodes[i];
+						var np:AtlasPlate = AtlasPlate(n.data);
+						
+						if (np == dmp.atlasPlate) {
+							
+							// Data Map Level is already a child of the levels group
+							
+							levelnode = n;
+							break;
+						} 
+							
+						if (dmp.atlasPlate.sagitalZOffsetFromLeft < np.sagitalZOffsetFromLeft) {
+							
+							// Data Map Level is not a child of the levels group and should be inserted at this position
+							
+							levelnode = {
+								type: TYPE_ATLAS_LEVEL,
+								data: dmp.atlasPlate,
+								label: dmp.atlasPlate.plateName,
+								children: new ArrayCollection()
+							};
+							levelnodes.addItemAt(levelnode,i);
+							break;
+						} 
+					}
+
+					if (levelnode == null) {
+						
+						// Data Map Level is not a child of the levels group and should be inserted at the end
+						
+						levelnode = {
+							type: TYPE_ATLAS_LEVEL,
+							data: dmp.atlasPlate,
+							label: dmp.atlasPlate.plateName,
+							children: new ArrayCollection()
+						};
+						levelnodes.addItem(levelnode);
+					}
+					
+					pushDatamapIntoLevelNode(dmi,levelnode);
+				}
+			}
+				
+			private function popsDatamapFromLevelsGroup(dmi:DataMapsViewItem,levelsGroup:Object):void {
+				var levelnodes:ArrayCollection = ArrayCollection(levelsGroup.children);
+				for (var dl:int = 0; dl <  dmi.datamap.sortedPLates.length; dl++) {
+					var dmp:DataMapPlate = dmi.datamap.sortedPLates[dl];
+					for (var i:int = 0 ; i < levelnodes.length; i++) {
+						var n:Object = levelnodes[i];
+						var np:AtlasPlate = AtlasPlate(n.data);
+						
+						if (np == dmp.atlasPlate) {
+							
+							// Data Map Level Found 
+							
+							popsDatamapFromLevelNode(dmi,n);
+							if (n.children.length == 0) {
+								levelnodes.removeItemAt(i);
+							}
+						
+							break;
+							
+						} 
+					}
+					
+				}
+			}
+			
+
+			private function pushDatamapIntoLevelNode(dmi:DataMapsViewItem, levelnode:Object):void {
+				var dmnode:Object = null;
+				var dmnodes:ArrayCollection = ArrayCollection(levelnode.children);
+				
+				for (var i:int = 0; i < dmnodes.length; i++) {
+					var n:Object = dmnodes[i];
+
+					if (n.data == dmi) {
+						
+						// Data Map node is already a children of levelnode - do nothing
+						
+						return;
+					}
+
+					if (dmi.datamap.name < n.label) {
+						
+						// Data Map node is not a children and should be inserted at this position
+						
+						dmnode = {
+							type: TYPE_DATA_MAP,
+							data: dmi,
+							label: dmi.datamap.name,
+							children: null
+						};
+						dmnodes.addItemAt(dmnode, i);
+						return;
+					}
+				}
+				
+				// Data Map node is not a children and should be inserted at the end
+				
+				dmnode = {
+					type: TYPE_DATA_MAP,
+					data: dmi,
+					label: dmi.datamap.name,
+					children: null
+				};
+				dmnodes.addItem(dmnode);
+			}
+			
+			
+			private function popsDatamapFromLevelNode(dmi:DataMapsViewItem, levelnode:Object):void {
+				var dmnode:Object = null;
+				var dmnodes:ArrayCollection = ArrayCollection(levelnode.children);
+				
+				for (var i:int = 0; i < dmnodes.length; i++) {
+					var n:Object = dmnodes[i];
+					
+					if (n.data == dmi) {
+						
+						// Data Map node found
+						
+						dmnodes.removeItemAt(i);
+						break;
+					}
+				}
+			}
+			
+			private function datamaps_changeHandler(event:CollectionEvent):void {
+				var dmi:DataMapsViewItem;
+				if (event.kind == CollectionEventKind.ADD) {
+					if (event.items.length > 1)
+						throw new IllegalOperationError("Only expecting single values additions");
+					dmi = event.items[0] as DataMapsViewItem;
+					if (dmi) {
+						pushDatamap(dmi,_treeModel);
+					}
+				} else if (event.kind == CollectionEventKind.REMOVE) {
+					if (event.items.length > 1)
+						throw new IllegalOperationError("Only expecting single values deletions");
+					dmi = event.items[0] as DataMapsViewItem;
+					if (dmi) {
+						popsDatamap(dmi,_treeModel);
+					}
+				}
+
+			}
+			
+
+			protected function dataMapTree_itemClickHandler(event:ListEvent):void
+			{
+				var node:Object = dataMapTree.selectedItem;
+				if (node && node.type == TYPE_ATLAS_LEVEL) {
+					var plate:AtlasPlate = node.data as AtlasPlate;
+					var atlas:AtlasStructure = plate.parent;
+					var atlasEvent:AtlasEvent = new AtlasEvent(AtlasEvent.ATLAS_PLATE_CLICK,atlas.atlasURI, plate.plateName);
+					dispatchEvent(atlasEvent);					
+				} else if (node && node.type == TYPE_DATA_MAP) {
+					var dmi:DataMapsViewItem = node.data as DataMapsViewItem;
+					var dm:DataMap = dmi.datamap;
+					var dmEvent:DataMapEvent = new DataMapEvent(DataMapEvent.DATA_MAP_CLICK,dm.uri, null);
+					dispatchEvent(dmEvent);					
+				}
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Metadata>
+		[Event(name="atlasPlateClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent")]
+		[Event(name="dataMapClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.DataMapEvent")]
+	</mx:Metadata>
+	<mx:Tree left="10" right="10" top="10" bottom="10" id="dataMapTree"
+			 dataProvider="{_treeModel}" labelField="label" 
+			 itemClick="dataMapTree_itemClickHandler(event)"/>
+</mx:Canvas>

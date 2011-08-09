@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="592" height="128">
+	
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.Atlases;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+			
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			
+			/**
+			 * Atlases to be included in this control. Atlases issues 
+			 * AtlasEvent.ADD_ATLAS and AtlasEvent.REMOVE_ATLAS event
+			 */
+			private var _openAtlases:Atlases;
+			
+			public function get openAtlases():Atlases {
+				return _openAtlases;
+			}
+			
+			public function set openAtlases(atlases:Atlases):void {
+				if (_openAtlases != null) {	
+					_openAtlases.removeEventListener(CollectionEvent.COLLECTION_CHANGE, openatlases_changeHandler,false);
+				}
+				_openAtlases = atlases;
+				if (_openAtlases != null) {
+					_openAtlases.addEventListener(CollectionEvent.COLLECTION_CHANGE,openatlases_changeHandler,false,0,true);
+				}
+			}
+			
+			/**
+			 * Handles openAtlases Collection Changing events. It adds/removes as a child of this component 
+			 * an AtlasSagittalPlateSelector component
+			 * connected to the added atlas.
+			 */
+			protected function openatlases_changeHandler(event:CollectionEvent):void {
+				if (event.kind == CollectionEventKind.ADD) {
+					if (event.items.length != 1)
+						throw new IllegalOperationError("Can't handle other than a single item add");
+					var atlas:AtlasStructure = event.items[0] as AtlasStructure;
+					if (atlas == null) 
+						throw new IllegalOperationError("Can't handle other than AtlasStructure additions");
+					
+					var atlasPlateSelector:AtlasSagittalPlateSelector = new AtlasSagittalPlateSelector();
+					atlasPlateSelector.atlas = atlas;
+					atlasPlateSelector.addEventListener(AtlasEvent.ATLAS_PLATE_CLICK,
+						atlasPalteSelector_atlasPlateClickHandler);
+					openAtlasesNav.addChild(atlasPlateSelector);
+					atlasPlateSelector.percentHeight = 100;
+					atlasPlateSelector.percentWidth = 100;
+					openAtlasesNav.selectedChild = atlasPlateSelector;
+				} else if  (event.kind == CollectionEventKind.REMOVE) {
+					//TODO implement	
+
+				}								
+			}
+
+			protected function atlasPalteSelector_atlasPlateClickHandler(event:AtlasEvent):void {
+				var newEvent:AtlasEvent = event.clone() as AtlasEvent;
+				dispatchEvent(newEvent);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Metadata>
+		[Event(name="atlasPlateClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent")]
+	</mx:Metadata>
+	<mx:TabNavigator top="10" left="10" right="10" bottom="10" id="openAtlasesNav" />		
+</mx:Canvas>

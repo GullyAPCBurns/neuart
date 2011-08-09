@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="536" height="140"
+		xmlns:views="edu.isi.bmkeg.neuart.atlasbrowser.views.*" 
+		label="{atlas.atlasName}" borderStyle="none" >
+	
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasPlate;
+			import edu.isi.bmkeg.neuart.atlasservice.AtlasStructure;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.events.ResizeEvent;
+
+			private static const LEVEL_LINE_IDLE_COLOR:String = "Gray";
+			private static const LEVEL_LINE_ROLLOVER_COLOR:String = "Blue";
+			
+			private var _atlas:AtlasStructure;
+			
+//			// Delete this. Needed for debugging
+//			[Bindable]
+//			private var _content:String;
+			
+			/**
+			 * Holds the SagittalLevelIndicator controls used to interact with 
+			 * plate levels
+			 */
+			private var _levelIndicators:ArrayCollection = null;
+			
+			/**
+			 * Indicates if the atlas property was changed and needs to be commited
+			 */
+			private var _isAtlasPropertyChanged:Boolean = false;
+			
+			/**
+			 * ratio between the height and the Width of the source sagittal image
+			 */
+			[Bindable]
+			private var _aspectRatio:Number = 0;			
+			
+			[Bindable]
+			public function get atlas():AtlasStructure {
+				return _atlas;
+			}
+			
+			public function set atlas(a:AtlasStructure):void {
+				_atlas = a;
+				_isAtlasPropertyChanged = true;
+				invalidateProperties();
+			}
+			
+			override protected function commitProperties():void {
+				super.commitProperties();
+				
+				if (_isAtlasPropertyChanged) {
+
+					var levelIndicator:SagitalLevelIndicator
+					
+					// Remove old levelIndicators
+					if (_levelIndicators) {
+						for each (levelIndicator in _levelIndicators) {
+							levelIndicator.removeEventListener(MouseEvent.CLICK,levelIndicator_clickHandler);
+							removeChild(levelIndicator);
+						}
+					}
+					
+					// Add new levelIndicators
+					if (_atlas) {
+						_levelIndicators = new ArrayCollection();
+						for each (var plate:AtlasPlate in _atlas.sortedPLates) {
+							levelIndicator = new SagitalLevelIndicator();
+							levelIndicator.atlasPlate = plate;
+							levelIndicator.addEventListener(MouseEvent.CLICK, levelIndicator_clickHandler);
+							_levelIndicators.addItem(levelIndicator);
+							addChild(levelIndicator);
+						}					
+					} else {
+						_levelIndicators = null;
+					}
+					
+					_isAtlasPropertyChanged = false;
+				}
+			}
+						
+			protected function levelIndicator_clickHandler(event:MouseEvent):void
+			{
+				var levelIndicator:SagitalLevelIndicator = event.target as SagitalLevelIndicator;
+				if (levelIndicator) {
+					var plate:AtlasPlate = levelIndicator.atlasPlate;
+					var atlasEvent:AtlasEvent = new AtlasEvent(AtlasEvent.ATLAS_PLATE_CLICK,atlas.atlasURI, plate.plateName);
+					dispatchEvent(atlasEvent);
+				} 
+			}
+
+			protected function image_completeHandler(event:Event):void
+			{
+				_aspectRatio = image.contentWidth / image.contentHeight;
+			}
+
+
+			protected function image_resizeHandler(event:ResizeEvent):void
+			{
+				if (event.oldHeight != image.height) {
+					adjustImageAspectRatio();
+				} 
+			}
+			
+			private function adjustImageAspectRatio():void {
+				if (_aspectRatio > 0) {
+					image.width = _aspectRatio * image.height; 
+				} 				
+			}
+			
+			private function adjustLevelIndicatorPositions():void {
+				if (_levelIndicators) {
+					var imageScale:Number = image.width / atlas.sagitalZLength;
+					var pos:Number = image.x;
+					for each (var levelIndicator:SagitalLevelIndicator in _levelIndicators) {
+						levelIndicator.x = pos + 
+							levelIndicator.atlasPlate.sagitalZOffsetFromLeft * imageScale; 
+					}
+				}				
+			}
+			
+			override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void {
+				super.updateDisplayList(unscaledWidth, unscaledHeight);
+				adjustLevelIndicatorPositions();
+//				_content = image.width + "  " + image.contentWidth;
+			}
+
+
+
+			protected function image_creationCompleteHandler(event:FlexEvent):void
+			{
+				// After creating image might be necessary to adjust the aspect ratio
+				adjustImageAspectRatio();
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Metadata>
+		[Event(name="atlasPlateClick",type="edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent")]
+	</mx:Metadata>
+	<mx:Image id="image" source="{Utils.insertWebContextUrl(atlas.sagitalImageURI)}" 
+			  horizontalAlign="center" verticalAlign="middle" top="0"  bottom="0" horizontalCenter="0"
+			  maintainAspectRatio="true" complete="image_completeHandler(event)"
+			  resize="image_resizeHandler(event)" creationComplete="image_creationCompleteHandler(event)"/>
+	<!-- <mx:Label text="{_content}" bottom="5" /> -->
+</mx:Canvas>

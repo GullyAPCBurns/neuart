@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300">
+	<mx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsView;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.DataMapsViewItem;
+			import edu.isi.bmkeg.neuart.atlasservice.DataMap;
+			
+			public static const CLICK_OPEN_DATA_MAP:String = "clickOpenDataMap";
+			public static const CLICK_CLOSE_DATA_MAP:String = "clickCloseDataMap";
+			
+			private var _datamaps:DataMapsView;
+			
+			public function get selectedDataMap():DataMap {
+				
+				var dmi:DataMapsViewItem = DataMapsViewItem(dataMapList.selectedItem);
+				if (dmi != null)
+					return dmi.datamap;
+				else
+					return null;
+				
+			}
+			
+			[Bindable]
+			public function get datamaps():DataMapsView {
+				return _datamaps;
+			}
+			
+			public function set datamaps(value:DataMapsView):void {
+				_datamaps = value;
+			}
+			
+			protected function openDataMapButton_clickHandler(event:MouseEvent):void
+			{
+				var addEvent:Event = new Event(CLICK_OPEN_DATA_MAP);
+				dispatchEvent(addEvent);
+			}
+			
+			protected function closeDataMapButton_clickHandler(event:MouseEvent):void
+			{
+				var addEvent:Event = new Event(CLICK_CLOSE_DATA_MAP);
+				dispatchEvent(addEvent);
+			}
+						
+		]]>
+	</mx:Script>
+	
+	<mx:Metadata>
+		[Event(name="clickOpenDataMap",type="flash.events.Event")]
+		[Event(name="clickCloseDataMap",type="flash.events.Event")]
+	</mx:Metadata>
+	
+	<mx:List id="dataMapList" left="10" right="10" top="10" bottom="35" 
+			 itemRenderer="edu.isi.bmkeg.neuart.atlasbrowser.views.DataMapHandlerItem"
+			 dataProvider="{datamaps}"/>
+	<mx:Button label="+" id="openDataMapButton" width="32" left="10" bottom="5" 
+			   click="openDataMapButton_clickHandler(event)" height="22"
+			   toolTip="Open Data Map"/>
+	<mx:Button label="-" id="closeDataMapButton" width="32" left="50" bottom="5" 
+			   click="closeDataMapButton_clickHandler(event)" height="22"
+			   toolTip="Close Data Map" enabled="{dataMapList.selectedIndex != -1}"/>
+</mx:Canvas>

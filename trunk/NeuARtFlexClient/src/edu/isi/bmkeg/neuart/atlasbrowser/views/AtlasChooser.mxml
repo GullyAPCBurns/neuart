@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+Component for selecting an Atlas from the atlasservice.
+It dispatches the SELECTED_ATLAS event of type 
+edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent.
+-->
+<mx:TitleWindow xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="absolute" 
+				width="400" height="300" title="Select an Atlas" 
+				showCloseButton="true" close="closeWindow(event)" 
+				>
+	<fx:Declarations> 
+		<mx:RemoteObject 
+			id="atlasService" 
+			destination="{BrowserModel.ATLAS_SERVICE_DEST}" 
+			endpoint="{Utils.getRemotingEndpoint()}" 
+			showBusyCursor="true">
+			<mx:method name="listAvailableAtlases" 
+					   fault="listAvailableAtlasesFailHandler(event)"/> 
+		</mx:RemoteObject> 
+	</fx:Declarations> 
+	<fx:Script>
+		<![CDATA[
+			import edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent;
+			import edu.isi.bmkeg.neuart.atlasbrowser.utils.Utils;
+			import edu.isi.bmkeg.neuart.atlasbrowser.views.models.BrowserModel;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			public static const SELECTED_ATLAS:String = "selectedAtlas";
+			
+			private function listAvailableAtlasesFailHandler(event:FaultEvent):void  
+			{ 
+				Alert.show(event.fault.faultString + '\n' + event.fault.faultDetail);
+			} 		
+
+			protected function closeWindow(event:CloseEvent):void 
+			{
+				cancel();	
+			}
+
+
+			protected function cancelButton_clickHandler(event:MouseEvent):void
+			{
+				cancel();
+			}
+
+
+			protected function openButton_clickHandler(event:MouseEvent):void
+			{
+				var selectedAtas:Object = atlasList.selectedItem;
+				var selectedEvent:AtlasEvent = 
+					new AtlasEvent(SELECTED_ATLAS,selectedAtas.atlasURI);
+				PopUpManager.removePopUp(this);
+				dispatchEvent(selectedEvent);
+			}
+			
+			protected function cancel():void
+			{
+				PopUpManager.removePopUp(this);	
+			}
+
+			
+			protected function atlasList_creationCompleteHandler(event:FlexEvent):void
+			{
+				atlasService.listAvailableAtlases();
+//				ListAvailableAtlasesResult.token = atlasserver.ListAvailableAtlases(new ListAvailableAtlasesRequest());
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Metadata>
+		[Event(name="selectedAtlas",type="edu.isi.bmkeg.neuart.atlasbrowser.events.AtlasEvent")]
+	</fx:Metadata>
+	<mx:List id="atlasList" top="10" left="10" right="10" bottom="40" labelField="atlasDescription" creationComplete="atlasList_creationCompleteHandler(event)" 
+			 dataProvider="{atlasService.listAvailableAtlases.lastResult}" />
+	<mx:Button label="Open" height="22" bottom="10" left="10" enabled="{atlasList.selectedIndex >= 0}" id="openButton" click="openButton_clickHandler(event)"/>
+	<mx:Button label="Cancel" bottom="10" left="85" click="cancelButton_clickHandler(event)" id="cancelButton"/>
+
+	
+</mx:TitleWindow>

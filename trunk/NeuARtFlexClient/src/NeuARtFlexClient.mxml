@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" minWidth="955" minHeight="600" width="100%" height="100%" xmlns:views="edu.isi.bmkeg.neuart.atlasbrowser.views.*"
+				pageTitle="NeuARt Client">
+	<views:AtlasBrowserFramework x="15" y="10" width="100%" height="100%">
+	</views:AtlasBrowserFramework>
+
+</mx:Application>
+
