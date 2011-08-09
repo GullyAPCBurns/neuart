@@ -1,0 +1,76 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<schema xmlns:tns="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/types" 
+	xmlns="http://www.w3.org/2001/XMLSchema" version="1.0" 
+	targetNamespace="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/types"
+	elementFormDefault="qualified">
+
+	<!-- *****************************************************
+		Atlas Types
+		****************************************************** -->
+
+	<complexType name="AtlasDescription">
+		<all>
+			<element name="atlasName" type="string" />
+			<element name="atlasDescription" type="string" minOccurs="0"/>
+			<element name="atlasURI" type="anyURI" />
+			<element name="atlasYear" type="int" minOccurs="0" />
+		</all>
+	</complexType>
+
+	<complexType name="AtlasStructure">
+		<sequence>
+			<element name="atlasName" type="string" />
+			<element name="atlasDescription" type="string" minOccurs="0"/>
+			<element name="atlasURI" type="anyURI" />
+			<element name="atlasYear" type="int" minOccurs="0" />
+			<element name="sagitalZLength" type="double" />
+			<element name="distanceFromLeftToBregma" type="double" minOccurs="0"/>
+			<element name="sagitalImageURI" type="string" />
+			<element name="atlasPlates" type="tns:AtlasPlate" nillable="false" minOccurs="1" maxOccurs="unbounded"/>
+		</sequence>
+	</complexType>
+	
+	<complexType name="AtlasPlate">
+		<all>
+			<element name="plateName" type="string" />
+			<element name="coronalImageURI" type="anyURI" />
+			<element name="coronalThumbnailURI" type="anyURI" />
+			<element name="sagitalZOffsetFromLeft" type="double" />
+		</all>
+	</complexType>
+
+	<!-- *****************************************************
+		Data Map Types
+		****************************************************** -->
+		
+	<complexType name="DataMapDescription">
+		<all>
+			<element name="name" type="string" />
+			<element name="uri" type="anyURI" />
+			<element name="description" type="string" minOccurs="0"/>
+			<element name="citation" type="string" minOccurs="0"/>
+			<element name="digitalLibraryKey" type="string" minOccurs="0"/>
+			<element name="atlasURI" type="anyURI" />
+		</all>
+	</complexType>
+
+	<complexType name="DataMap">
+		<sequence>
+			<element name="name" type="string" />
+			<element name="description" type="string" minOccurs="0"/>
+			<element name="uri" type="anyURI" />
+			<element name="citation" type="string" minOccurs="0"/>
+			<element name="digitalLibraryKey" type="string" minOccurs="0"/>
+			<element name="atlasURI" type="anyURI" />
+			<element name="dataMapPlates" type="tns:DataMapPlate" nillable="false" minOccurs="1" maxOccurs="unbounded"/>
+		</sequence>
+	</complexType>
+	
+	<complexType name="DataMapPlate">
+		<all>
+			<element name="atlasPlateName" type="string" />
+			<element name="coronalLayerImageURI" type="anyURI" />
+		</all>
+	</complexType>
+			
+</schema>

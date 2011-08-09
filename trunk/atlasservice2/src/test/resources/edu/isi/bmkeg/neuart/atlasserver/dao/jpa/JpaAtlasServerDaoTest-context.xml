@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/web-services http://www.springframework.org/schema/web-services/web-services-1.5.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<!--
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+		Base Beans
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-->
+
+	<context:annotation-config />
+
+ 	<bean class="org.springframework.beans.factory.annotation.RequiredAnnotationBeanPostProcessor"/>  
+
+	<import resource="classpath:Testcontext-inc.xml"/>
+	
+    <context:component-scan base-package="edu.isi.bmkeg.neuart.atlasserver.dao.jpa" />   
+         
+	<import resource="classpath:/edu/isi/bmkeg/neuart/atlasserver/dao/jpa/applicationContext-daojpa.xml"/>
+    	    	    
+</beans>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/j2ee"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee 
+  		http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd" 
+  		version="2.4">
+
+    <display-name>Bmkeg Server Template</display-name>
+    
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>
+            WEB-INF/applicationContext.xml
+            classpath:edu/isi/bmkeg/neuart/atlasserver/dao/jpa/applicationContext-daojpa.xml            
+            classpath:edu/isi/bmkeg/neuart/atlasserver/ws/applicationContext-ws.xml            
+            classpath:edu/isi/bmkeg/utils/secured/applicationContext-secured.xml            
+		</param-value>
+	</context-param>
+
+	<!-- Open Entity Manager in View Pattern -->    
+  	<filter>
+		<filter-name>openEntityManagerInViewFilter</filter-name>
+		<filter-class>org.springframework.orm.jpa.support.OpenEntityManagerInViewFilter</filter-class>
+   		<init-param>
+      		<param-name>entityManagerFactoryBeanName</param-name>        
+      		<param-value>entityManagerFactory</param-value>        
+   		</init-param>
+   	</filter>
+
+	<filter-mapping>
+		<filter-name>openEntityManagerInViewFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+
+	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+ 
+	<!-- Web Services listeners and filters-->    
+    <servlet>
+        <servlet-name>ws</servlet-name>
+        <servlet-class>org.springframework.ws.transport.http.MessageDispatcherServlet</servlet-class>
+		<init-param>
+			<param-name>transformWsdlLocations</param-name>
+			<param-value>true</param-value>
+		</init-param>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ws</servlet-name>
+        <url-pattern>/services</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ws</servlet-name>
+        <url-pattern>*.wsdl</url-pattern>
+    </servlet-mapping>
+     
+     <mime-mapping>
+        <extension>xsd</extension>
+        <mime-type>text/xml</mime-type>
+    </mime-mapping>
+
+	<!-- Flex listeners and filters-->    
+   	<listener>
+		<listener-class>flex.messaging.HttpFlexSession</listener-class>
+	</listener>
+	
+	<servlet>
+		<servlet-name>flex</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+
+	<servlet-mapping>
+    	<servlet-name>flex</servlet-name>
+    	<url-pattern>/messagebroker/*</url-pattern>
+ 	</servlet-mapping>
+ 
+     <welcome-file-list>
+		<welcome-file>index.html</welcome-file>
+	</welcome-file-list>
+	
+	<!-- Security Listeners -->
+	<!-- Uncomment the following filter definition to restrict the 
+	 access to the web application resources to only authorized users.
+	 
+	 The Authorization rules are defined in  
+	 /edu/isi/bmkeg/utils/secured/applicationContext-secured.xml
+	 and the user properties are defined in /etc/user.properties .
+	 -->
+	
+	<filter>
+		<filter-name>springSecurityFilterChain</filter-name>
+		<filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>
+	</filter>
+	<filter-mapping>
+		<filter-name>springSecurityFilterChain</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+	
+</web-app>

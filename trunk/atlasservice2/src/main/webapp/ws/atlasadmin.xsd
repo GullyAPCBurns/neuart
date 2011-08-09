@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema"
+	xmlns:types="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/types"
+	targetNamespace="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/admintypes" 
+	xmlns:tns="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/admintypes" elementFormDefault="qualified">
+	
+	<import namespace="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/types"
+		schemaLocation="atlastypes.xsd"/>
+		
+	<element name="DataMap" type="types:DataMap" />
+</schema>

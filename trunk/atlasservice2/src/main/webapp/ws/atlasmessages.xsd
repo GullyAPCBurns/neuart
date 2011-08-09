@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<schema xmlns:tns="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/messages" 
+	xmlns="http://www.w3.org/2001/XMLSchema" version="1.0" 
+	targetNamespace="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/messages"
+	xmlns:types="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/types"
+	elementFormDefault="qualified">
+	
+	<import namespace="http://atlasserver.bmkeg.isi.edu/atlaswebservice/schemas/types"
+		schemaLocation="atlastypes.xsd"/>
+
+	<!-- *****************************************************
+		Atlas Types
+		****************************************************** -->
+
+	<element name="GetAtlasStructureRequest">
+		<complexType>
+			<sequence>
+				<element name="atlasURI" type="anyURI" minOccurs="1" />
+			</sequence>
+		</complexType>
+	</element>
+
+	<element name="GetAtlasStructureResponse">
+		<complexType>
+			<sequence>
+				<element name="return" type="types:AtlasStructure" minOccurs="0" />
+			</sequence>
+		</complexType>
+	</element>
+
+	<element name="ListAvailableAtlasesRequest">
+		<complexType>
+			<sequence />
+		</complexType>	
+	</element>
+
+ 	<element name="ListAvailableAtlasesResponse">
+		<complexType>
+			<sequence>
+				<element name="return" type="types:AtlasDescription" minOccurs="0" maxOccurs="unbounded" />
+			</sequence>
+		</complexType>	
+	</element>
+
+	<!-- *****************************************************
+		Data Map Types
+		****************************************************** -->
+
+	<element name="GetDataMapRequest">
+		<complexType>
+			<sequence>
+				<element name="datamapURI" type="anyURI" minOccurs="1" />
+			</sequence>
+		</complexType>
+	</element>
+
+	<element name="GetDataMapResponse">
+		<complexType>
+			<sequence>
+				<element name="return" type="types:DataMap" minOccurs="0" />
+			</sequence>
+		</complexType>
+	</element>
+
+	<element name="ListAvailableDataMapsRequest">
+		<complexType>
+			<sequence>
+				<element name="atlasURI" type="anyURI" minOccurs="1" />
+			</sequence>
+		</complexType>
+	</element>
+
+ 	<element name="ListAvailableDataMapsResponse">
+		<complexType>
+			<sequence>
+				<element name="return" type="types:DataMapDescription" minOccurs="0" maxOccurs="unbounded" />
+			</sequence>
+		</complexType>	
+	</element>
+
+		
+
+</schema>

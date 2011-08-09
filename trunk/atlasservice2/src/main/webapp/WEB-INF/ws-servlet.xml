@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- ===================== WSDL DEFINITION    ============================== -->
+
+    <bean id="atlasserver" class="org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition">
+        <description>
+            Builds a WSDL from the xsd.This bean definition represents the atlasserver.wsdl file found
+            in the root of the web application.
+        </description>
+        <property name="schemaCollection" ref="schemaCollection"/>
+        <property name="portTypeName" value="Atlasserver"/>
+        <property name="locationUri" value="/services"/>
+        <property name="targetNamespace"
+                value="http://atlasserver.bmkeg.isi.edu/atlaswebservice/definitions"/>
+    </bean>
+    
+</beans>

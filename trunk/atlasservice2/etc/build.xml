@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." name="AdminCommands">
+    <property environment="env"/>
+	<property name="env.CATALINA_HOME" location="/usr/share/tomcat5" />
+	<property name="catalina.home" location="${env.CATALINA_HOME}" />
+	<property name="data.dir" location="../data" />
+	<property name="swanson1998.atlas.specfile" location="${data.dir}/etc/atlases/swanson1998/Atlas.xml" />
+	<property name="swanson2004.atlas.specfile" location="${data.dir}/etc/atlases/swanson2004/Atlas.xml" />
+	<property name="swanson2004.brainregions.specfile" location="${data.dir}/etc/atlases/swanson2004/BrainRegions.xml" />
+	<property name="swanson1998.datamaps.dir" location="${data.dir}/etc/datamaps/swanson1998" />
+	<property name="swanson2004.datamaps.dir" location="${data.dir}/etc/datamaps/swanson2004" />
+	
+	<!--
+		webapp.dir has to point to the directory of the expanded atlasservice.war
+	--> 
+	<property name="webapp.dir" location="${catalina.home}/webapps/atlasservicev2" />
+
+	<!-- 
+		Parameter properties
+	-->
+	<property name="adminCommand.file" value="a filename" />
+	<property name="adminCommand.atlasUri" value="a URI" />
+	<property name="adminCommand.datamapUri" value="a URI" />
+	<path id="war.classpath">
+		<fileset dir="${webapp.dir}/WEB-INF/lib">
+		    <include name="*.jar"/>
+		</fileset>
+		<pathelement location="${webapp.dir}/WEB-INF/classes"/>
+	</path>
+	
+	<target name="load">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="load" />
+			<arg file="${adminCommand.file}"/>
+		</java>
+	</target>
+	
+	<target name="list">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="list"/>
+		</java>
+	</target>
+
+	<target name="delete">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="delete" />
+			<arg value="${adminCommand.atlasUri}"/>
+		</java>
+	</target>
+
+	<target name="listdms">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="listdms" />
+			<arg value="${adminCommand.atlasUri}"/>
+		</java>
+	</target>
+
+	<target name="listdm">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="listdm"/>
+			<arg value="${adminCommand.datamapUri}"/>
+		</java>
+	</target>
+
+	<target name="deletedm">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="deletedm"/>
+			<arg value="${adminCommand.datamapUri}"/>
+		</java>
+	</target>
+
+	<target name="loaddm">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="loaddm" />
+			<arg file="${adminCommand.file}"/>
+		</java>
+	</target>
+	
+	<target name="loaddms">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="loaddms" />
+			<arg file="${adminCommand.file}"/>
+		</java>
+	</target>
+	
+	<target name="loadbr">
+		<java classname="edu.isi.bmkeg.neuart.atlasserver.admin.AtlasAdmin"
+			classpathref="war.classpath" 
+			fork="true">
+			<arg value="loadbr" />
+			<arg file="${adminCommand.file}"/>
+		</java>
+	</target>
+	
+	<target name="help">
+		<echo message="Usage:" />
+		<echo message="ant loadAtlasSwanson1998" />
+		<echo message="ant loadAtlasSwanson2004" />
+		<echo message="ant loadDatamapsSwanson1998" />
+		<echo message="ant loadDatamapsSwanson2004" />
+		<echo message="ant -DadminCommand.file='atlas_definition_file.xml' load" />
+		<echo message="ant list" />
+		<echo message="ant -DadminCommand.atlasUri='atlasURI'' delete" />
+		<echo message="ant -DadminCommand.atlasUri='atlasURI' listdms" />
+		<echo message="ant -DadminCommand.datamapUri='datamapURI' listdm" />
+		<echo message="ant -DadminCommand.datamapUri='datamapURI' deletedm" />
+		<echo message="ant -DadminCommand.file='datamap_definition_file.xml' loaddm" />
+		<echo message="ant -DadminCommand.file='datamaps_definitions_dir' loaddms" />
+		<echo message="ant -DadminCommand.file='brain_regions_definition_file.xml' loadbr" />
+	</target>
+	
+	<target name="loadAtlasSwanson1998">
+		<antcall target="load">
+			<param name="adminCommand.file" value="${swanson1998.atlas.specfile}"/>
+		</antcall>
+	</target>
+
+	<target name="loadAtlasSwanson2004">
+		<antcall target="load">
+			<param name="adminCommand.file" value="${swanson2004.atlas.specfile}"/>
+		</antcall>
+		<antcall target="loadbr">
+			<param name="adminCommand.file" value="${swanson2004.brainregions.specfile}"/>
+		</antcall>
+	</target>
+
+
+	<target name="loadDatamapsSwanson1998">
+		<antcall target="loaddms">
+			<param name="adminCommand.file" value="${swanson1998.datamaps.dir}"/>
+		</antcall>
+	</target>
+
+	<target name="loadDatamapsSwanson2004">
+		<antcall target="loaddms">
+			<param name="adminCommand.file" value="${swanson2004.datamaps.dir}"/>
+		</antcall>
+	</target>
+
+</project>
