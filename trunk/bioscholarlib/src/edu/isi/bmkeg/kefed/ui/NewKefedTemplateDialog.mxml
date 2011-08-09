@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- $Id: NewKefedTemplateDialog.mxml 1180 2010-09-22 17:19:40Z tom $ 
+     $Date: 2010-09-22 10:19:40 -0700 (Wed, 22 Sep 2010) $
+     $Revision: 1180 $ -->
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	title="Add New KEfED Model" layout="absolute"	showCloseButton="true">
+	<mx:VBox bottom="10" horizontalAlign="center">		
+		<mx:Form id="form">
+			<mx:FormItem label="Design Name">
+				<mx:TextInput id="Name" text=""/>				
+			</mx:FormItem>		
+			<mx:FormItem label="Design Source">
+				<mx:TextInput id="Source" text=""/>				
+			</mx:FormItem>	
+			<mx:FormItem label="Template Description">
+				<mx:TextArea id="Description" text=""/>				
+			</mx:FormItem>
+			<mx:FormItem>
+				<mx:HBox >
+					<mx:Button label="OK" id="OkButton"/>
+					<mx:Button label="Cancel" id="cancelButton"/>
+				</mx:HBox>
+			</mx:FormItem>
+		</mx:Form>
+	</mx:VBox>
+	
+</mx:TitleWindow>
